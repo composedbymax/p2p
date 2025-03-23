@@ -1,20 +1,17 @@
 <?php
 if (isset($_GET['roomId'], $_GET['role'])) {
   $roomId = preg_replace('/[^a-zA-Z0-9]/', '', $_GET['roomId']);
-  $role   = preg_replace('/[^a-zA-Z]/', '', $_GET['role']);
+  $role = preg_replace('/[^a-zA-Z]/', '', $_GET['role']);
   $filename = "signal_{$role}_{$roomId}.json";
   $key = hash('sha256', $roomId . '_encryption_salt', true);
   switch($_SERVER['REQUEST_METHOD']) {
-    case 'DELETE':
-      echo json_encode(file_exists($filename) ? (unlink($filename) ? ["status"=>"deleted"] : ["status"=>"error deleting"]) : ["status"=>"file not found"]);
-      exit;
+    case 'DELETE': echo json_encode(file_exists($filename) ? (unlink($filename) ? ["status"=>"deleted"] : ["status"=>"error deleting"]) : ["status"=>"file not found"]); exit;
     case 'POST':
       $data = file_get_contents("php://input");
       $iv = openssl_random_pseudo_bytes(16);
       $encrypted = openssl_encrypt($data, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
       file_put_contents($filename, base64_encode($iv . $encrypted));
-      echo json_encode(["status" => "saved", "encrypted" => true]);
-      exit;
+      echo json_encode(["status" => "saved", "encrypted" => true]); exit;
     case 'GET':
       if (file_exists($filename)) {
         $binary = base64_decode(file_get_contents($filename));
@@ -22,9 +19,7 @@ if (isset($_GET['roomId'], $_GET['role'])) {
         $encrypted = substr($binary, 16);
         header('Content-Type: application/json');
         echo openssl_decrypt($encrypted, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
-      } else {
-        echo json_encode(["status" => "no data"]);
-      }
+      } else echo json_encode(["status" => "no data"]);
       exit;
   }
 }
@@ -75,116 +70,73 @@ if (isset($_GET['roomId'], $_GET['role'])) {
   <?php include '../footer.php' ?>
   <script>
     const localVideo = document.getElementById('localVideo'),
-          remoteVideo  = document.getElementById('remoteVideo'),
-          startBtn  = document.getElementById('startVideo'),
-          stopBtn   = document.getElementById('stopVideo'),
+          remoteVideo = document.getElementById('remoteVideo'),
+          startBtn = document.getElementById('startVideo'),
+          stopBtn = document.getElementById('stopVideo'),
           shareScreenBtn = document.getElementById('shareScreen'),
           stopScreenBtn = document.getElementById('stopScreen'),
           switchToCameraBtn = document.getElementById('switchToCamera'),
           createBtn = document.getElementById('createRoom'),
-          joinBtn   = document.getElementById('joinRoom'),
-          genBtn    = document.getElementById('generateRoom'),
-          discBtn   = document.getElementById('disconnectBtn'),
+          joinBtn = document.getElementById('joinRoom'),
+          genBtn = document.getElementById('generateRoom'),
+          discBtn = document.getElementById('disconnectBtn'),
           roomInput = document.getElementById('roomId'),
-          connStat  = document.getElementById('connectionStatus'),
-          peerStat  = document.getElementById('peerStatus'),
+          connStat = document.getElementById('connectionStatus'),
+          peerStat = document.getElementById('peerStatus'),
           config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
-    let localStream, screenStream, pc, roomId, isCreator = false, pollAnswer, pollOffer;
-    let activeStream = 'camera';
+    let localStream, screenStream, pc, roomId, isCreator = false, pollAnswer, pollOffer, activeStream = 'camera';
     const updateStatus = msg => { connStat.textContent = 'Status: ' + msg; console.log(msg); },
-          updatePeer = msg => peerStat.textContent = msg;
-    const genRoomId = () => {
-      roomId = Array.from({length:12}, () => 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'.charAt(Math.floor(Math.random()*62))).join('');
-      roomInput.value = roomId;
-    };
+          updatePeer = msg => peerStat.textContent = msg,
+          genRoomId = () => { roomId = Array.from({length:12}, () => 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'.charAt(Math.floor(Math.random()*62))).join(''); roomInput.value = roomId; };
     const startVideo = async () => {
       try {
         localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
         localVideo.srcObject = localStream;
         activeStream = 'camera';
-        startBtn.disabled = true; 
-        stopBtn.disabled = false;
-        shareScreenBtn.disabled = false;
+        startBtn.disabled = true; stopBtn.disabled = false; shareScreenBtn.disabled = false;
         updateStatus('Camera started. You can now create or join a room.');
       } catch(e) { updateStatus('Failed to access camera/microphone: ' + e.message); }
     };
     const stopVideo = () => {
       if (activeStream === 'camera' && localStream) {
         localStream.getTracks().forEach(t => t.stop());
-        localVideo.srcObject = null; 
-        localStream = null;
-        startBtn.disabled = false; 
-        stopBtn.disabled = true;
-        shareScreenBtn.disabled = true;
-        switchToCameraBtn.disabled = true;
+        localVideo.srcObject = null; localStream = null;
+        startBtn.disabled = false; stopBtn.disabled = true; shareScreenBtn.disabled = true; switchToCameraBtn.disabled = true;
         updateStatus('Camera stopped.');
       }
     };
     const startScreenShare = async () => {
       try {
-        screenStream = await navigator.mediaDevices.getDisplayMedia({
-          video: {
-            cursor: 'always',
-            displaySurface: 'monitor'
-          },
-          audio: false
-        });
-        screenStream.getVideoTracks()[0].onended = () => {
-          stopScreenShare();
-        };
+        screenStream = await navigator.mediaDevices.getDisplayMedia({video:{cursor:'always',displaySurface:'monitor'}, audio:false});
+        screenStream.getVideoTracks()[0].onended = () => stopScreenShare();
         if (pc) {
-          const videoSenders = pc.getSenders().filter(sender => 
-            sender.track && sender.track.kind === 'video'
-          );
-          if (videoSenders.length > 0) {
-            videoSenders.forEach(sender => {
-              sender.replaceTrack(screenStream.getVideoTracks()[0]);
-            });
-          }
+          pc.getSenders().filter(sender => sender.track && sender.track.kind === 'video')
+            .forEach(sender => sender.replaceTrack(screenStream.getVideoTracks()[0]));
         }
         localVideo.srcObject = screenStream;
         activeStream = 'screen';
-        shareScreenBtn.disabled = true;
-        stopScreenBtn.disabled = false;
-        switchToCameraBtn.disabled = false;
+        shareScreenBtn.disabled = true; stopScreenBtn.disabled = false; switchToCameraBtn.disabled = false;
         updateStatus('Screen sharing started');
-      } catch (e) {
-        updateStatus('Failed to start screen sharing: ' + e.message);
-      }
+      } catch (e) { updateStatus('Failed to start screen sharing: ' + e.message); }
     };
     const stopScreenShare = () => {
       if (screenStream) {
         screenStream.getTracks().forEach(track => track.stop());
         screenStream = null;
-        shareScreenBtn.disabled = false;
-        stopScreenBtn.disabled = true;
-        switchToCameraBtn.disabled = true;
-        if (localStream) {
-          switchToCamera();
-        } else {
-          localVideo.srcObject = null;
-          activeStream = null;
-        }
+        shareScreenBtn.disabled = false; stopScreenBtn.disabled = true; switchToCameraBtn.disabled = true;
+        localStream ? switchToCamera() : (localVideo.srcObject = null, activeStream = null);
         updateStatus('Screen sharing stopped');
       }
     };
     const switchToCamera = () => {
       if (localStream) {
         if (pc) {
-          const videoSenders = pc.getSenders().filter(sender => 
-            sender.track && sender.track.kind === 'video'
-          );
-          if (videoSenders.length > 0) {
-            videoSenders.forEach(sender => {
-              sender.replaceTrack(localStream.getVideoTracks()[0]);
-            });
-          }
+          pc.getSenders().filter(sender => sender.track && sender.track.kind === 'video')
+            .forEach(sender => sender.replaceTrack(localStream.getVideoTracks()[0]));
         }
         localVideo.srcObject = localStream;
         activeStream = 'camera';
-        shareScreenBtn.disabled = false;
-        stopScreenBtn.disabled = true;
-        switchToCameraBtn.disabled = true;
+        shareScreenBtn.disabled = false; stopScreenBtn.disabled = true; switchToCameraBtn.disabled = true;
         updateStatus('Switched back to camera');
       }
     };
@@ -194,9 +146,7 @@ if (isset($_GET['roomId'], $_GET['role'])) {
         localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
       } else if (activeStream === 'screen' && screenStream) {
         pc.addTrack(screenStream.getVideoTracks()[0], screenStream);
-        if (localStream && localStream.getAudioTracks().length > 0) {
-          pc.addTrack(localStream.getAudioTracks()[0], localStream);
-        }
+        localStream?.getAudioTracks()[0] && pc.addTrack(localStream.getAudioTracks()[0], localStream);
       }
       pc.onicecandidate = e => {
         if (e.candidate) console.log('ICE candidate:', e.candidate);
@@ -204,37 +154,27 @@ if (isset($_GET['roomId'], $_GET['role'])) {
       };
       pc.onconnectionstatechange = () => {
         const state = pc.connectionState;
-        if (state==='connected') { 
-          updateStatus('Peer connection established!'); 
-          updatePeer('Connected'); 
-          deleteSDP(); 
-        }
-        else if (state==='disconnected' || state==='failed') { 
-          updateStatus('Peer connection lost.'); 
-          updatePeer('Disconnected'); 
-        }
+        if (state === 'connected') { updateStatus('Peer connection established!'); updatePeer('Connected'); deleteSDP(); }
+        else if (state === 'disconnected' || state === 'failed') { updateStatus('Peer connection lost.'); updatePeer('Disconnected'); }
       };
       pc.ontrack = e => { 
-        if (remoteVideo.srcObject !== e.streams[0]) { 
-          remoteVideo.srcObject = e.streams[0]; 
-          updatePeer('Video connected'); 
-        } 
+        if (remoteVideo.srcObject !== e.streams[0]) { remoteVideo.srcObject = e.streams[0]; updatePeer('Video connected'); } 
       };
     };
     const deleteSDP = () => {
       ['offer','answer'].forEach(role => {
-        fetch('index.php?roomId='+roomId+'&role='+role, { method:'DELETE' })
-          .then(r=>r.json()).then(data=> console.log('Deleted '+role+':', data))
-          .catch(err=> console.error('Error deleting '+role, err));
+        fetch('index.php?roomId='+roomId+'&role='+role, {method:'DELETE'})
+          .then(r=>r.json()).then(data=>console.log('Deleted '+role+':', data))
+          .catch(err=>console.error('Error deleting '+role, err));
       });
       updateStatus('Connection established and signaling data deleted.');
     };
     const postSDP = (sdp, role) => {
       fetch('index.php?roomId='+roomId+'&role='+role, {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ type: sdp.type, sdp: sdp.sdp })
-      }).then(r=>r.json()).then(data=> console.log(role+' posted:', data))
-        .catch(e=> console.error('Error posting '+role, e));
+        body: JSON.stringify({type:sdp.type, sdp:sdp.sdp})
+      }).then(r=>r.json()).then(data=>console.log(role+' posted:', data))
+        .catch(e=>console.error('Error posting '+role, e));
     };
     const createOffer = async () => {
       try { 
@@ -261,17 +201,15 @@ if (isset($_GET['roomId'], $_GET['role'])) {
             callback(data);
           }
         } catch(e){ console.log('Waiting for '+role+'...'); }
-      },2000);
+      }, 2000);
     };
     const createRoom = () => {
       if (!localStream && !screenStream) return updateStatus('Please start your camera or share your screen first.');
       roomId = roomInput.value;
       if (!roomId) return updateStatus('Please enter or generate a room ID.');
-      isCreator = true; 
-      initPC();
+      isCreator = true; initPC();
       updateStatus('Room created! Creating offer...');
-      createBtn.disabled = joinBtn.disabled = true; 
-      discBtn.disabled = false;
+      createBtn.disabled = joinBtn.disabled = true; discBtn.disabled = false;
       createOffer();
       pollAnswer = pollSDP('answer', async data => {
         updateStatus('Answer received. Establishing connection...');
@@ -282,11 +220,9 @@ if (isset($_GET['roomId'], $_GET['role'])) {
       if (!localStream && !screenStream) return updateStatus('Please start your camera or share your screen first.');
       roomId = roomInput.value;
       if (!roomId) return updateStatus('Please enter a room ID to join.');
-      isCreator = false; 
-      initPC();
+      isCreator = false; initPC();
       updateStatus('Joining room. Waiting for offer...');
-      createBtn.disabled = joinBtn.disabled = true; 
-      discBtn.disabled = false;
+      createBtn.disabled = joinBtn.disabled = true; discBtn.disabled = false;
       pollOffer = pollSDP('offer', async data => {
         updateStatus('Offer received. Creating answer...');
         await pc.setRemoteDescription(new RTCSessionDescription(data));
@@ -301,8 +237,7 @@ if (isset($_GET['roomId'], $_GET['role'])) {
       deleteSDP();
       pc && (pc.close(), pc = null);
       remoteVideo.srcObject = null;
-      createBtn.disabled = joinBtn.disabled = false; 
-      discBtn.disabled = true;
+      createBtn.disabled = joinBtn.disabled = false; discBtn.disabled = true;
       updateStatus('Disconnected from peer.');
       updatePeer('Waiting for peer to connect...');
     };
