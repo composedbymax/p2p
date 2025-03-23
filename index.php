@@ -3,15 +3,47 @@ if (isset($_GET['roomId']) && isset($_GET['role'])) {
     $roomId = preg_replace('/[^a-zA-Z0-9]/', '', $_GET['roomId']);
     $role = preg_replace('/[^a-zA-Z]/', '', $_GET['role']);
     $filename = "signal_{$role}_{$roomId}.json";
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $data = file_get_contents("php://input");
-        file_put_contents($filename, $data);
-        echo "Saved";
-        exit;
-    } else if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         if (file_exists($filename)) {
+            unlink($filename);
+            echo json_encode(["status" => "deleted"]);
+        } else {
+            echo json_encode(["status" => "file not found"]);
+        }
+        exit;
+    }
+    else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $data = file_get_contents("php://input");
+        $encryptionKey = hash('sha256', $roomId . '_encryption_salt', true);
+        $iv = openssl_random_pseudo_bytes(16);
+        $encryptedData = openssl_encrypt(
+            $data,
+            'AES-256-CBC',
+            $encryptionKey,
+            OPENSSL_RAW_DATA,
+            $iv
+        );
+        $dataToStore = base64_encode($iv . $encryptedData);
+        file_put_contents($filename, $dataToStore);
+        echo json_encode(["status" => "saved", "encrypted" => true]);
+        exit;
+    } 
+    else if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        if (file_exists($filename)) {
+            $encryptionKey = hash('sha256', $roomId . '_encryption_salt', true);
+            $storedData = file_get_contents($filename);
+            $binaryData = base64_decode($storedData);
+            $iv = substr($binaryData, 0, 16);
+            $encryptedData = substr($binaryData, 16);
+            $decryptedData = openssl_decrypt(
+                $encryptedData,
+                'AES-256-CBC',
+                $encryptionKey,
+                OPENSSL_RAW_DATA,
+                $iv
+            );
             header('Content-Type: application/json');
-            readfile($filename);
+            echo $decryptedData;
         } else {
             echo json_encode(["status" => "no data"]);
         }
@@ -24,7 +56,7 @@ if (isset($_GET['roomId']) && isset($_GET['role'])) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>P2P Video Sharing</title>
+  <title>P2P - MW</title>
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -128,7 +160,7 @@ if (isset($_GET['roomId']) && isset($_GET['role'])) {
 </head>
 <body>
   <div class="container">
-    <h1>P2P Video Sharing</h1>
+    <h1>P2P</h1>
     <div class="connection-info">
       <h3>Connection Setup</h3>
       <div class="room-controls">
@@ -180,6 +212,8 @@ if (isset($_GET['roomId']) && isset($_GET['role'])) {
     let peerConnection;
     let roomId;
     let isRoomCreator = false;
+    let pollAnswerInterval = null;
+    let pollOfferInterval = null;
     function init() {
       startVideoBtn.addEventListener('click', startVideo);
       stopVideoBtn.addEventListener('click', stopVideo);
@@ -190,7 +224,12 @@ if (isset($_GET['roomId']) && isset($_GET['role'])) {
       generateRoomId();
     }
     function generateRoomId() {
-      roomId = Math.floor(100000 + Math.random() * 900000).toString();
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      let result = '';
+      for (let i = 0; i < 12; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      roomId = result;
       roomIdInput.value = roomId;
     }
     async function startVideo() {
@@ -273,6 +312,7 @@ if (isset($_GET['roomId']) && isset($_GET['role'])) {
         if (peerConnection.connectionState === 'connected') {
           updateStatus('Peer connection established!');
           updatePeerStatus('Connected');
+          deleteSignalingData();
         } else if (peerConnection.connectionState === 'disconnected' || 
                    peerConnection.connectionState === 'failed') {
           updateStatus('Peer connection lost.');
@@ -286,6 +326,21 @@ if (isset($_GET['roomId']) && isset($_GET['role'])) {
           updatePeerStatus('Video connected');
         }
       };
+    }
+    function deleteSignalingData() {
+      fetch('index.php?roomId=' + roomId + '&role=offer', {
+        method: 'DELETE'
+      })
+      .then(response => response.json())
+      .then(data => console.log('Deleted offer data:', data))
+      .catch(error => console.error('Error deleting offer data:', error));
+      fetch('index.php?roomId=' + roomId + '&role=answer', {
+        method: 'DELETE'
+      })
+      .then(response => response.json())
+      .then(data => console.log('Deleted answer data:', data))
+      .catch(error => console.error('Error deleting answer data:', error));
+      updateStatus('Connection established and signaling data deleted.');
     }
     async function createOffer() {
       try {
@@ -313,17 +368,19 @@ if (isset($_GET['roomId']) && isset($_GET['role'])) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: sdp.type, sdp: sdp.sdp })
       })
-      .then(response => response.text())
+      .then(response => response.json())
       .then(data => console.log(role + ' posted:', data))
       .catch(error => console.error('Error posting ' + role + ':', error));
     }
     function pollForOffer() {
-      const interval = setInterval(async () => {
+      if (pollOfferInterval) clearInterval(pollOfferInterval);
+      pollOfferInterval = setInterval(async () => {
         try {
           const response = await fetch('index.php?roomId=' + roomId + '&role=offer');
           const data = await response.json();
           if (data && data.type && data.sdp) {
-            clearInterval(interval);
+            clearInterval(pollOfferInterval);
+            pollOfferInterval = null;
             updateStatus('Offer received. Creating answer...');
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data));
             await createAnswer();
@@ -339,12 +396,14 @@ if (isset($_GET['roomId']) && isset($_GET['role'])) {
       }, 2000);
     }
     function pollForAnswer() {
-      const interval = setInterval(async () => {
+      if (pollAnswerInterval) clearInterval(pollAnswerInterval);
+      pollAnswerInterval = setInterval(async () => {
         try {
           const response = await fetch('index.php?roomId=' + roomId + '&role=answer');
           const data = await response.json();
           if (data && data.type && data.sdp) {
-            clearInterval(interval);
+            clearInterval(pollAnswerInterval);
+            pollAnswerInterval = null;
             updateStatus('Answer received. Establishing connection...');
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data));
           }
@@ -354,6 +413,15 @@ if (isset($_GET['roomId']) && isset($_GET['role'])) {
       }, 2000);
     }
     function disconnect() {
+      if (pollAnswerInterval) {
+        clearInterval(pollAnswerInterval);
+        pollAnswerInterval = null;
+      }
+      if (pollOfferInterval) {
+        clearInterval(pollOfferInterval);
+        pollOfferInterval = null;
+      }
+      deleteSignalingData();
       if (peerConnection) {
         peerConnection.close();
         peerConnection = null;
