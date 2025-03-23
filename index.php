@@ -1,54 +1,32 @@
 <?php
-if (isset($_GET['roomId']) && isset($_GET['role'])) {
-    $roomId = preg_replace('/[^a-zA-Z0-9]/', '', $_GET['roomId']);
-    $role = preg_replace('/[^a-zA-Z]/', '', $_GET['role']);
-    $filename = "signal_{$role}_{$roomId}.json";
-    if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
-        if (file_exists($filename)) {
-            unlink($filename);
-            echo json_encode(["status" => "deleted"]);
-        } else {
-            echo json_encode(["status" => "file not found"]);
-        }
-        exit;
-    }
-    else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $data = file_get_contents("php://input");
-        $encryptionKey = hash('sha256', $roomId . '_encryption_salt', true);
-        $iv = openssl_random_pseudo_bytes(16);
-        $encryptedData = openssl_encrypt(
-            $data,
-            'AES-256-CBC',
-            $encryptionKey,
-            OPENSSL_RAW_DATA,
-            $iv
-        );
-        $dataToStore = base64_encode($iv . $encryptedData);
-        file_put_contents($filename, $dataToStore);
-        echo json_encode(["status" => "saved", "encrypted" => true]);
-        exit;
-    } 
-    else if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        if (file_exists($filename)) {
-            $encryptionKey = hash('sha256', $roomId . '_encryption_salt', true);
-            $storedData = file_get_contents($filename);
-            $binaryData = base64_decode($storedData);
-            $iv = substr($binaryData, 0, 16);
-            $encryptedData = substr($binaryData, 16);
-            $decryptedData = openssl_decrypt(
-                $encryptedData,
-                'AES-256-CBC',
-                $encryptionKey,
-                OPENSSL_RAW_DATA,
-                $iv
-            );
-            header('Content-Type: application/json');
-            echo $decryptedData;
-        } else {
-            echo json_encode(["status" => "no data"]);
-        }
-        exit;
-    }
+if (isset($_GET['roomId'], $_GET['role'])) {
+  $roomId = preg_replace('/[^a-zA-Z0-9]/', '', $_GET['roomId']);
+  $role   = preg_replace('/[^a-zA-Z]/', '', $_GET['role']);
+  $filename = "signal_{$role}_{$roomId}.json";
+  $key = hash('sha256', $roomId . '_encryption_salt', true);
+  switch($_SERVER['REQUEST_METHOD']) {
+    case 'DELETE':
+      echo json_encode(file_exists($filename) ? (unlink($filename) ? ["status"=>"deleted"] : ["status"=>"error deleting"]) : ["status"=>"file not found"]);
+      exit;
+    case 'POST':
+      $data = file_get_contents("php://input");
+      $iv = openssl_random_pseudo_bytes(16);
+      $encrypted = openssl_encrypt($data, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
+      file_put_contents($filename, base64_encode($iv . $encrypted));
+      echo json_encode(["status" => "saved", "encrypted" => true]);
+      exit;
+    case 'GET':
+      if (file_exists($filename)) {
+        $binary = base64_decode(file_get_contents($filename));
+        $iv = substr($binary, 0, 16);
+        $encrypted = substr($binary, 16);
+        header('Content-Type: application/json');
+        echo openssl_decrypt($encrypted, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
+      } else {
+        echo json_encode(["status" => "no data"]);
+      }
+      exit;
+  }
 }
 ?>
 <!DOCTYPE html>
@@ -56,111 +34,29 @@ if (isset($_GET['roomId']) && isset($_GET['role'])) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>P2P - MW</title>
+  <title>Secure P2P Video Sharing</title>
   <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      margin: 0;
-      padding: 20px;
-      background-color: #f5f5f5;
-      color: #333;
-    }
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      background-color: white;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    h1 {
-      text-align: center;
-      color: #2c3e50;
-    }
-    .videos {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 20px;
-      margin-bottom: 20px;
-    }
-    .video-container {
-      flex: 1;
-      min-width: 300px;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      overflow: hidden;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    .video-container h3 {
-      margin: 0;
-      padding: 10px;
-      background-color: #2c3e50;
-      color: white;
-      font-size: 16px;
-      text-align: center;
-    }
-    video {
-      width: 100%;
-      background-color: #000;
-      display: block;
-    }
-    .controls {
-      padding: 15px;
-      background-color: #f8f9fa;
-      border-top: 1px solid #eee;
-    }
-    .connection-info {
-      margin-bottom: 20px;
-      padding: 15px;
-      background-color: #f8f9fa;
-      border-radius: 8px;
-      border: 1px solid #ddd;
-    }
-    .room-controls {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 15px;
-    }
-    .btn {
-      background-color: #3498db;
-      color: white;
-      border: none;
-      padding: 10px 15px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-      transition: background-color 0.3s;
-    }
-    .btn:hover {
-      background-color: #2980b9;
-    }
-    .btn:disabled {
-      background-color: #95a5a6;
-      cursor: not-allowed;
-    }
-    .btn-danger {
-      background-color: #e74c3c;
-    }
-    .btn-danger:hover {
-      background-color: #c0392b;
-    }
-    #roomId {
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-family: monospace;
-      flex: 1;
-    }
-    .status {
-      margin-top: 10px;
-      font-size: 14px;
-      color: #7f8c8d;
-    }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin:0; padding:20px; background:#f5f5f5; color:#333; }
+    .container { max-width:1200px; margin:0 auto; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.1); }
+    h1 { text-align:center; color:#2c3e50; }
+    .videos { display:flex; flex-wrap:wrap; gap:20px; margin-bottom:20px; }
+    .video-container { flex:1; min-width:300px; border:1px solid #ddd; border-radius:8px; overflow:hidden; box-shadow:0 2px 5px rgba(0,0,0,0.1); }
+    .video-container h3 { margin:0; padding:10px; background:#2c3e50; color:#fff; font-size:16px; text-align:center; }
+    video { width:100%; background:#000; display:block; }
+    .controls, .connection-info { padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; margin-bottom:15px; }
+    .room-controls { display:flex; gap:10px; margin-bottom:15px; }
+    .btn { background:#3498db; color:#fff; border:none; padding:10px 15px; border-radius:4px; cursor:pointer; font-size:14px; transition:background 0.3s; }
+    .btn:hover { background:#2980b9; }
+    .btn:disabled { background:#95a5a6; cursor:not-allowed; }
+    .btn-danger { background:#e74c3c; }
+    .btn-danger:hover { background:#c0392b; }
+    #roomId { padding:10px; border:1px solid #ddd; border-radius:4px; font-family:monospace; flex:1; }
+    .status { margin-top:10px; font-size:14px; color:#7f8c8d; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>P2P</h1>
+    <h1>Secure P2P Video Sharing</h1>
     <div class="connection-info">
       <h3>Connection Setup</h3>
       <div class="room-controls">
@@ -191,256 +87,142 @@ if (isset($_GET['roomId']) && isset($_GET['role'])) {
     <button id="disconnectBtn" class="btn btn-danger" disabled>Disconnect</button>
   </div>
   <script>
-    const localVideo = document.getElementById('localVideo');
-    const remoteVideo = document.getElementById('remoteVideo');
-    const startVideoBtn = document.getElementById('startVideo');
-    const stopVideoBtn = document.getElementById('stopVideo');
-    const createRoomBtn = document.getElementById('createRoom');
-    const joinRoomBtn = document.getElementById('joinRoom');
-    const generateRoomBtn = document.getElementById('generateRoom');
-    const disconnectBtn = document.getElementById('disconnectBtn');
-    const roomIdInput = document.getElementById('roomId');
-    const connectionStatus = document.getElementById('connectionStatus');
-    const peerStatus = document.getElementById('peerStatus');
-    const configuration = {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
+    const localVideo = document.getElementById('localVideo'),
+          remoteVideo  = document.getElementById('remoteVideo'),
+          startBtn  = document.getElementById('startVideo'),
+          stopBtn   = document.getElementById('stopVideo'),
+          createBtn = document.getElementById('createRoom'),
+          joinBtn   = document.getElementById('joinRoom'),
+          genBtn    = document.getElementById('generateRoom'),
+          discBtn   = document.getElementById('disconnectBtn'),
+          roomInput = document.getElementById('roomId'),
+          connStat  = document.getElementById('connectionStatus'),
+          peerStat  = document.getElementById('peerStatus'),
+          config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
+    let localStream, pc, roomId, isCreator = false, pollAnswer, pollOffer;
+    const updateStatus = msg => { connStat.textContent = 'Status: ' + msg; console.log(msg); },
+          updatePeer = msg => peerStat.textContent = msg;
+    const genRoomId = () => {
+      roomId = Array.from({length:12}, () => 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'.charAt(Math.floor(Math.random()*62))).join('');
+      roomInput.value = roomId;
     };
-    let localStream;
-    let peerConnection;
-    let roomId;
-    let isRoomCreator = false;
-    let pollAnswerInterval = null;
-    let pollOfferInterval = null;
-    function init() {
-      startVideoBtn.addEventListener('click', startVideo);
-      stopVideoBtn.addEventListener('click', stopVideo);
-      createRoomBtn.addEventListener('click', createRoom);
-      joinRoomBtn.addEventListener('click', joinRoom);
-      generateRoomBtn.addEventListener('click', generateRoomId);
-      disconnectBtn.addEventListener('click', disconnect);
-      generateRoomId();
-    }
-    function generateRoomId() {
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-      let result = '';
-      for (let i = 0; i < 12; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      roomId = result;
-      roomIdInput.value = roomId;
-    }
-    async function startVideo() {
+    const startVideo = async () => {
       try {
-        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
         localVideo.srcObject = localStream;
-        startVideoBtn.disabled = true;
-        stopVideoBtn.disabled = false;
+        startBtn.disabled = true; stopBtn.disabled = false;
         updateStatus('Camera started. You can now create or join a room.');
-      } catch (error) {
-        console.error('Error accessing media devices:', error);
-        updateStatus('Failed to access camera and microphone. ' + error.message);
-      }
-    }
-    function stopVideo() {
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-        localVideo.srcObject = null;
-        localStream = null;
-        startVideoBtn.disabled = false;
-        stopVideoBtn.disabled = true;
-        updateStatus('Camera stopped.');
-      }
-    }
-    function createRoom() {
-      if (!localStream) {
-        updateStatus('Please start your camera first.');
-        return;
-      }
-      roomId = roomIdInput.value;
-      if (!roomId) {
-        updateStatus('Please enter or generate a room ID.');
-        return;
-      }
-      isRoomCreator = true;
-      initializePeerConnection();
-      updateStatus('Room created! Creating offer...');
-      createRoomBtn.disabled = true;
-      joinRoomBtn.disabled = true;
-      disconnectBtn.disabled = false;
-      createOffer();
-    }
-    function joinRoom() {
-      if (!localStream) {
-        updateStatus('Please start your camera first.');
-        return;
-      }
-      roomId = roomIdInput.value;
-      if (!roomId) {
-        updateStatus('Please enter a room ID to join.');
-        return;
-      }
-      isRoomCreator = false;
-      initializePeerConnection();
-      updateStatus('Joining room. Waiting for offer...');
-      createRoomBtn.disabled = true;
-      joinRoomBtn.disabled = true;
-      disconnectBtn.disabled = false;
-      pollForOffer();
-    }
-    function initializePeerConnection() {
-      peerConnection = new RTCPeerConnection(configuration);
-      if (localStream) {
-        localStream.getTracks().forEach(track => {
-          peerConnection.addTrack(track, localStream);
-        });
-      }
-      peerConnection.onicecandidate = event => {
-        if (event.candidate) {
-          console.log('New ICE candidate:', event.candidate);
-        } else {
-          if (isRoomCreator && peerConnection.localDescription) {
-            postSDP(peerConnection.localDescription, 'offer');
-            pollForAnswer();
-          }
-        }
+      } catch(e) { updateStatus('Failed to access camera/microphone: ' + e.message); }
+    };
+    const stopVideo = () => {
+      localStream && localStream.getTracks().forEach(t => t.stop());
+      localVideo.srcObject = null; localStream = null;
+      startBtn.disabled = false; stopBtn.disabled = true;
+      updateStatus('Camera stopped.');
+    };
+    const initPC = () => {
+      pc = new RTCPeerConnection(config);
+      localStream && localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+      pc.onicecandidate = e => {
+        if (e.candidate) console.log('ICE candidate:', e.candidate);
+        else if (isCreator && pc.localDescription) postSDP(pc.localDescription, 'offer');
       };
-      peerConnection.onconnectionstatechange = () => {
-        console.log('Connection state:', peerConnection.connectionState);
-        if (peerConnection.connectionState === 'connected') {
-          updateStatus('Peer connection established!');
-          updatePeerStatus('Connected');
-          deleteSignalingData();
-        } else if (peerConnection.connectionState === 'disconnected' || 
-                   peerConnection.connectionState === 'failed') {
-          updateStatus('Peer connection lost.');
-          updatePeerStatus('Disconnected');
-        }
+      pc.onconnectionstatechange = () => {
+        const state = pc.connectionState;
+        if (state==='connected') { updateStatus('Peer connection established!'); updatePeer('Connected'); deleteSDP(); }
+        else if (state==='disconnected' || state==='failed') { updateStatus('Peer connection lost.'); updatePeer('Disconnected'); }
       };
-      peerConnection.ontrack = event => {
-        if (remoteVideo.srcObject !== event.streams[0]) {
-          remoteVideo.srcObject = event.streams[0];
-          console.log('Received remote stream');
-          updatePeerStatus('Video connected');
-        }
-      };
-    }
-    function deleteSignalingData() {
-      fetch('index.php?roomId=' + roomId + '&role=offer', {
-        method: 'DELETE'
-      })
-      .then(response => response.json())
-      .then(data => console.log('Deleted offer data:', data))
-      .catch(error => console.error('Error deleting offer data:', error));
-      fetch('index.php?roomId=' + roomId + '&role=answer', {
-        method: 'DELETE'
-      })
-      .then(response => response.json())
-      .then(data => console.log('Deleted answer data:', data))
-      .catch(error => console.error('Error deleting answer data:', error));
+      pc.ontrack = e => { if (remoteVideo.srcObject !== e.streams[0]) { remoteVideo.srcObject = e.streams[0]; updatePeer('Video connected'); } };
+    };
+    const deleteSDP = () => {
+      ['offer','answer'].forEach(role => {
+        fetch('index.php?roomId='+roomId+'&role='+role, { method:'DELETE' })
+          .then(r=>r.json()).then(data=> console.log('Deleted '+role+':', data))
+          .catch(err=> console.error('Error deleting '+role, err));
+      });
       updateStatus('Connection established and signaling data deleted.');
-    }
-    async function createOffer() {
-      try {
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        updateStatus('Offer created. Waiting for answer...');
-      } catch (error) {
-        console.error('Error creating offer:', error);
-        updateStatus('Failed to create offer: ' + error.message);
-      }
-    }
-    async function createAnswer() {
-      try {
-        const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
-        updateStatus('Answer created. Sending answer back to creator...');
-      } catch (error) {
-        console.error('Error creating answer:', error);
-        updateStatus('Failed to create answer: ' + error.message);
-      }
-    }
-    function postSDP(sdp, role) {
-      fetch('index.php?roomId=' + roomId + '&role=' + role, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+    };
+    const postSDP = (sdp, role) => {
+      fetch('index.php?roomId='+roomId+'&role='+role, {
+        method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ type: sdp.type, sdp: sdp.sdp })
-      })
-      .then(response => response.json())
-      .then(data => console.log(role + ' posted:', data))
-      .catch(error => console.error('Error posting ' + role + ':', error));
-    }
-    function pollForOffer() {
-      if (pollOfferInterval) clearInterval(pollOfferInterval);
-      pollOfferInterval = setInterval(async () => {
+      }).then(r=>r.json()).then(data=> console.log(role+' posted:', data))
+        .catch(e=> console.error('Error posting '+role, e));
+    };
+    const createOffer = async () => {
+      try { 
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        updateStatus('Offer created. Waiting for answer...');
+      } catch(e){ updateStatus('Offer creation failed: '+e.message); }
+    };
+    const createAnswer = async () => {
+      try {
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        updateStatus('Answer created. Sending answer back to creator...');
+      } catch(e){ updateStatus('Answer creation failed: '+e.message); }
+    };
+    const pollSDP = (role, callback, intervalVar) => {
+      intervalVar && clearInterval(intervalVar);
+      return setInterval(async () => {
         try {
-          const response = await fetch('index.php?roomId=' + roomId + '&role=offer');
-          const data = await response.json();
+          const res = await fetch('index.php?roomId='+roomId+'&role='+role);
+          const data = await res.json();
           if (data && data.type && data.sdp) {
-            clearInterval(pollOfferInterval);
-            pollOfferInterval = null;
-            updateStatus('Offer received. Creating answer...');
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data));
-            await createAnswer();
-            peerConnection.onicecandidate = event => {
-              if (!event.candidate && peerConnection.localDescription) {
-                postSDP(peerConnection.localDescription, 'answer');
-              }
-            };
+            clearInterval(intervalVar);
+            callback(data);
           }
-        } catch (error) {
-          console.log('Waiting for offer...');
-        }
-      }, 2000);
-    }
-    function pollForAnswer() {
-      if (pollAnswerInterval) clearInterval(pollAnswerInterval);
-      pollAnswerInterval = setInterval(async () => {
-        try {
-          const response = await fetch('index.php?roomId=' + roomId + '&role=answer');
-          const data = await response.json();
-          if (data && data.type && data.sdp) {
-            clearInterval(pollAnswerInterval);
-            pollAnswerInterval = null;
-            updateStatus('Answer received. Establishing connection...');
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data));
-          }
-        } catch (error) {
-          console.log('Waiting for answer...');
-        }
-      }, 2000);
-    }
-    function disconnect() {
-      if (pollAnswerInterval) {
-        clearInterval(pollAnswerInterval);
-        pollAnswerInterval = null;
-      }
-      if (pollOfferInterval) {
-        clearInterval(pollOfferInterval);
-        pollOfferInterval = null;
-      }
-      deleteSignalingData();
-      if (peerConnection) {
-        peerConnection.close();
-        peerConnection = null;
-      }
+        } catch(e){ console.log('Waiting for '+role+'...'); }
+      },2000);
+    };
+    const createRoom = () => {
+      if (!localStream) return updateStatus('Please start your camera first.');
+      roomId = roomInput.value;
+      if (!roomId) return updateStatus('Please enter or generate a room ID.');
+      isCreator = true; initPC();
+      updateStatus('Room created! Creating offer...');
+      createBtn.disabled = joinBtn.disabled = true; discBtn.disabled = false;
+      createOffer();
+      pollAnswer = pollSDP('answer', async data => {
+        updateStatus('Answer received. Establishing connection...');
+        await pc.setRemoteDescription(new RTCSessionDescription(data));
+      });
+    };
+    const joinRoom = () => {
+      if (!localStream) return updateStatus('Please start your camera first.');
+      roomId = roomInput.value;
+      if (!roomId) return updateStatus('Please enter a room ID to join.');
+      isCreator = false; initPC();
+      updateStatus('Joining room. Waiting for offer...');
+      createBtn.disabled = joinBtn.disabled = true; discBtn.disabled = false;
+      pollOffer = pollSDP('offer', async data => {
+        updateStatus('Offer received. Creating answer...');
+        await pc.setRemoteDescription(new RTCSessionDescription(data));
+        await createAnswer();
+        pc.onicecandidate = e => {
+          if (!e.candidate && pc.localDescription) postSDP(pc.localDescription, 'answer');
+        };
+      });
+    };
+    const disconnect = () => {
+      [pollAnswer, pollOffer].forEach(interval => interval && clearInterval(interval));
+      deleteSDP();
+      pc && (pc.close(), pc = null);
       remoteVideo.srcObject = null;
-      createRoomBtn.disabled = false;
-      joinRoomBtn.disabled = false;
-      disconnectBtn.disabled = true;
+      createBtn.disabled = joinBtn.disabled = false; discBtn.disabled = true;
       updateStatus('Disconnected from peer.');
-      updatePeerStatus('Waiting for peer to connect...');
-    }
-    function updateStatus(message) {
-      connectionStatus.textContent = 'Status: ' + message;
-      console.log(message);
-    }
-    function updatePeerStatus(message) {
-      peerStatus.textContent = message;
-    }
-    window.addEventListener('load', init);
+      updatePeer('Waiting for peer to connect...');
+    };
+    window.addEventListener('load', () => {
+      startBtn.addEventListener('click', startVideo);
+      stopBtn.addEventListener('click', stopVideo);
+      createBtn.addEventListener('click', createRoom);
+      joinBtn.addEventListener('click', joinRoom);
+      genBtn.addEventListener('click', genRoomId);
+      discBtn.addEventListener('click', disconnect);
+      genRoomId();
+    });
   </script>
 </body>
 </html>
