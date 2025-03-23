@@ -35,28 +35,10 @@ if (isset($_GET['roomId'], $_GET['role'])) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Secure P2P Video Sharing</title>
-  <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin:0; padding:20px; background:#f5f5f5; color:#333; }
-    .container { max-width:1200px; margin:0 auto; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.1); }
-    h1 { text-align:center; color:#2c3e50; }
-    .videos { display:flex; flex-wrap:wrap; gap:20px; margin-bottom:20px; }
-    .video-container { flex:1; min-width:300px; border:1px solid #ddd; border-radius:8px; overflow:hidden; box-shadow:0 2px 5px rgba(0,0,0,0.1); }
-    .video-container h3 { margin:0; padding:10px; background:#2c3e50; color:#fff; font-size:16px; text-align:center; }
-    video { width:100%; background:#000; display:block; }
-    .controls, .connection-info { padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; margin-bottom:15px; }
-    .room-controls { display:flex; gap:10px; margin-bottom:15px; }
-    .btn { background:#3498db; color:#fff; border:none; padding:10px 15px; border-radius:4px; cursor:pointer; font-size:14px; transition:background 0.3s; }
-    .btn:hover { background:#2980b9; }
-    .btn:disabled { background:#95a5a6; cursor:not-allowed; }
-    .btn-danger { background:#e74c3c; }
-    .btn-danger:hover { background:#c0392b; }
-    #roomId { padding:10px; border:1px solid #ddd; border-radius:4px; font-family:monospace; flex:1; }
-    .status { margin-top:10px; font-size:14px; color:#7f8c8d; }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="container">
-    <h1>Secure P2P Video Sharing</h1>
     <div class="connection-info">
       <h3>Connection Setup</h3>
       <div class="room-controls">
