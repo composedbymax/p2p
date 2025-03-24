@@ -167,7 +167,8 @@ if(isset($_GET['roomId'],$_GET['role'])){
                 const state = pc.connectionState;
                 if(state==='connected'){
                   updateStatus('Peer connection established!');
-                  updatePeer('Connected'); deleteSDP();
+                  updatePeer('Connected');
+                  deleteSDP();
                 } else if(state==='disconnected'||state==='failed'){
                   updateStatus('Peer connection lost.');
                   updatePeer('Disconnected');
@@ -210,15 +211,18 @@ if(isset($_GET['roomId'],$_GET['role'])){
                 updateStatus('Answer created. Sending answer back to creator...');
               } catch(e){ updateStatus('Answer creation failed: '+e.message); }
             },
-            pollSDP = (role, callback, intervalVar) => {
-              intervalVar && clearInterval(intervalVar);
-              return setInterval(async () => {
+            pollSDP = (role, callback) => {
+              const interval = setInterval(async () => {
                 try{
                   const res = await fetch('index.php?roomId='+roomId+'&role='+role);
                   const data = await res.json();
-                  if(data?.type && data.sdp){ clearInterval(intervalVar); callback(data); }
+                  if(data?.type && data.sdp){
+                    clearInterval(interval);
+                    callback(data);
+                  }
                 } catch(e){ console.log('Waiting for '+role+'...'); }
               },2000);
+              return interval;
             },
             createRoom = () => {
               if(!localStream && !screenStream) return updateStatus('Please start your camera or share your screen first.');
