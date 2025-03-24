@@ -271,6 +271,38 @@ if(isset($_GET['roomId'],$_GET['role'])){
         genBtn.addEventListener('click', genRoomId);
         discBtn.addEventListener('click', disconnect);
         genRoomId();
+        const localVideoContainer = document.querySelector('.video-container:nth-child(1)');
+        const remoteVideoContainer = document.querySelector('.video-container:nth-child(2)');
+        const createExpandBtn = (container) => {
+          const expandBtn = document.createElement('button');
+          expandBtn.className = 'expand-btn';
+          const expandIcon = document.createElement('span');
+          expandIcon.className = 'expand-icon';
+          expandBtn.appendChild(expandIcon);
+          expandBtn.addEventListener('click', () => {
+            const isExpanded = container.classList.contains('expanded');
+            document.querySelectorAll('.video-container').forEach(cont => {
+              cont.classList.remove('expanded');
+              const btn = cont.querySelector('.expand-btn');
+              if (btn) {
+                btn.innerHTML = '';
+                const icon = document.createElement('span');
+                icon.className = 'expand-icon';
+                btn.appendChild(icon);
+              }
+            });
+            if (!isExpanded) {
+              container.classList.add('expanded');
+              expandBtn.innerHTML = '';
+              const retractIcon = document.createElement('span');
+              retractIcon.className = 'retract-icon';
+              expandBtn.appendChild(retractIcon);
+            }
+          });
+          container.appendChild(expandBtn);
+        };
+        createExpandBtn(localVideoContainer);
+        createExpandBtn(remoteVideoContainer);
       });
     })();
   </script>
