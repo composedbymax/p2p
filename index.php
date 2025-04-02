@@ -31,8 +31,11 @@ if(isset($_GET['roomId'],$_GET['role'])){
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>P2P</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="/slider.css">
 </head>
 <body>
+  <script src="speech.js"></script>
+  <script src="merge.js"></script>
   <?php include '../header.php'; ?>
   <div class="container">
     <div class="connection-info">
@@ -229,6 +232,7 @@ if(isset($_GET['roomId'],$_GET['role'])){
               roomId = roomInput.value;
               if(!roomId) return updateStatus('Please enter or generate a room ID.');
               isCreator = true; initPC();
+              isInActiveRoom = true;
               updateStatus('Room created! Creating offer...');
               createBtn.disabled = joinBtn.disabled = true; discBtn.disabled = false;
               createOffer();
@@ -236,12 +240,13 @@ if(isset($_GET['roomId'],$_GET['role'])){
                 updateStatus('Answer received. Establishing connection...');
                 await pc.setRemoteDescription(new RTCSessionDescription(data));
               });
-            },
+            };
             joinRoom = () => {
               if(!localStream && !screenStream) return updateStatus('Please start your camera or share your screen first.');
               roomId = roomInput.value;
               if(!roomId) return updateStatus('Please enter a room ID to join.');
               isCreator = false; initPC();
+              isInActiveRoom = true;
               updateStatus('Joining room. Waiting for offer...');
               createBtn.disabled = joinBtn.disabled = true; discBtn.disabled = false;
               pollOffer = pollSDP('offer', async data => {
@@ -250,13 +255,14 @@ if(isset($_GET['roomId'],$_GET['role'])){
                 await createAnswer();
                 pc.onicecandidate = e => { if(!e.candidate && pc.localDescription) postSDP(pc.localDescription, 'answer'); };
               });
-            },
+            };
             disconnect = () => {
               [pollAnswer, pollOffer].forEach(i => i && clearInterval(i));
               deleteSDP();
               if(pc){ pc.close(); pc = null; }
               remoteVideo.srcObject = null;
               createBtn.disabled = joinBtn.disabled = false; discBtn.disabled = true;
+              isInActiveRoom = false;
               updateStatus('Disconnected from peer.');
               updatePeer('Waiting for peer to connect...');
             };
@@ -305,6 +311,13 @@ if(isset($_GET['roomId'],$_GET['role'])){
         createExpandBtn(remoteVideoContainer);
       });
     })();
+    window.addEventListener('beforeunload', (e) => {
+      if (isInActiveRoom) {
+        e.preventDefault();
+        e.returnValue = 'You are currently in an active video call. Are you sure you want to leave?';
+        return e.returnValue;
+      }
+    });
   </script>
 </body>
 </html>
