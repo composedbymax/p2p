@@ -1,4 +1,4 @@
-1. button fix (start/stop combined) (stop sharing redundant)
+1. button fix (start/stop combined)
 
 2. Mute/Unmute functionality 
 
