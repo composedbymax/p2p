@@ -190,7 +190,7 @@ if(isset($_GET['roomId'],$_GET['role'])){
                   .then(r=>r.json()).then(data=>console.log('Deleted '+r+':',data))
                   .catch(err=>console.error('Error deleting '+r,err));
               });
-              updateStatus('Connection established and signaling data deleted.');
+              updateStatus('P2P Connection established');
             },
             postSDP = (sdp,role) => {
               fetch('index.php?roomId='+roomId+'&role='+role,{
@@ -234,7 +234,7 @@ if(isset($_GET['roomId'],$_GET['role'])){
               isCreator = true; initPC();
               isInActiveRoom = true;
               updateStatus('Room created! Creating offer...');
-              createBtn.disabled = joinBtn.disabled = true; discBtn.disabled = false;
+              createBtn.disabled = joinBtn.disabled = genBtn.disabled = true; discBtn.disabled = false;
               createOffer();
               pollAnswer = pollSDP('answer', async data => {
                 updateStatus('Answer received. Establishing connection...');
@@ -261,7 +261,7 @@ if(isset($_GET['roomId'],$_GET['role'])){
               deleteSDP();
               if(pc){ pc.close(); pc = null; }
               remoteVideo.srcObject = null;
-              createBtn.disabled = joinBtn.disabled = false; discBtn.disabled = true;
+              createBtn.disabled = joinBtn.disabled = genBtn.disabled = false; discBtn.disabled = true;
               isInActiveRoom = false;
               updateStatus('Disconnected from peer.');
               updatePeer('Waiting for peer to connect...');
