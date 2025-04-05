@@ -10,16 +10,17 @@
     <meta name="description" content="P2P connections">
     <meta name="author" content="MAX W">
     <meta name="robots" content="noindex, nofollow">
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'nonce-<?php echo $_SESSION['nonce']; ?>';">
     <meta http-equiv="Strict-Transport-Security" content="max-age=31536000; includeSubDomains; preload">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'nonce-<?php echo $_SESSION['nonce']; ?>';">
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
-    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
     <meta http-equiv="Permissions-Policy" content="geolocation=(), microphone=(self), camera=(self)">
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="root.css">
     <link rel="stylesheet" href="slider.css">
 </head>
 <body>
+
 <?php
 $error = $_SESSION['flash']['error'];
 $success = $_SESSION['flash']['success'];

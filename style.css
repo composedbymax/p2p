@@ -187,7 +187,22 @@ video {
     border-radius: 4px;
     background-color: var(--shade);
     color: white;
+    
 }
+
+
+input {
+    display: block;
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: var(--light);
+    background-color: var(--shade);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    transition: border-color 0.15s ease-in-out;
+  }
 .auth-buttons {
     display: flex;
     gap: 10px;
