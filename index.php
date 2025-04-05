@@ -1,127 +1,89 @@
 <?php
 session_start();
-define('USERS_FILE', 'users.json');
 define('ROOMS_FILE', 'rooms.json');
-if (!file_exists(USERS_FILE)) {
-    file_put_contents(USERS_FILE, json_encode([]));
-}
 if (!file_exists(ROOMS_FILE)) {
     file_put_contents(ROOMS_FILE, json_encode([]));
 }
-function authenticateUser($username, $password) {
-    $users = json_decode(file_get_contents(USERS_FILE), true);
-    foreach ($users as $user) {
-        if ($user['username'] === $username && password_verify($password, $user['password'])) {
+
+function verifyRoomPassword($roomId, $password) {
+    $rooms = json_decode(file_get_contents(ROOMS_FILE), true);
+    foreach ($rooms as $room) {
+        if ($room['id'] === $roomId && password_verify($password, $room['password'])) {
             return true;
         }
     }
     return false;
 }
-function registerUser($username, $password) {
-    $users = json_decode(file_get_contents(USERS_FILE), true);
-    foreach ($users as $user) {
-        if ($user['username'] === $username) {
-            return false;
-        }
-    }
-    $users[] = [
-        'username' => $username,
-        'password' => password_hash($password, PASSWORD_DEFAULT)
-    ];
-    file_put_contents(USERS_FILE, json_encode($users));
-    return true;
-}
-function handleRoom($roomId, $username, $isCreate = false) {
+
+function handleRoom($roomId, $password, $isCreate = false) {
     $rooms = json_decode(file_get_contents(ROOMS_FILE), true);
     $roomExists = false;
     foreach ($rooms as $index => $room) {
         if (isset($room['id']) && $room['id'] === $roomId) {
             $roomExists = true;
             $rooms[$index]['lastAccessed'] = time();
-            if (!in_array($username, $room['users'])) {
-                $rooms[$index]['users'][] = $username;
-            }
             break;
         }
+    }
+    if ($roomExists && $isCreate) {
+        return false;
     }
     if (!$roomExists && $isCreate) {
         $rooms[] = [
             'id' => $roomId,
-            'creator' => $username,
+            'password' => password_hash($password, PASSWORD_DEFAULT),
             'created' => time(),
             'lastAccessed' => time(),
-            'users' => [$username]
         ];
         $roomExists = true;
     }
     file_put_contents(ROOMS_FILE, json_encode($rooms));
     return $roomExists;
 }
-$error = null;
-$success = null;
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+// Initialize flash messages
+if (!isset($_SESSION['flash'])) {
+    $_SESSION['flash'] = ['error' => null, 'success' => null];
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_GET['roomId'], $_GET['role'])) {
+    $error = null;
+    $success = null;
     if (isset($_POST['action'])) {
-        $username = preg_replace('/[^a-zA-Z0-9_]/', '', $_POST['username'] ?? '');
         $password = $_POST['password'] ?? '';
         $roomId = preg_replace('/[^a-zA-Z0-9]/', '', $_POST['roomId'] ?? '');
-        if (empty($username) || empty($password) || empty($roomId)) {
-            $error = "All fields are required.";
+        if (empty($password) || empty($roomId)) {
+            $error = "Room ID and password are required.";
         } else {
             if ($_POST['action'] === 'create') {
-                if (!authenticateUser($username, $password)) {
-                    registerUser($username, $password);
-                }
-                if (handleRoom($roomId, $username, true)) {
-                    $_SESSION['username'] = $username;
+                if (handleRoom($roomId, $password, true)) {
                     $_SESSION['roomId'] = $roomId;
                     $success = "Room created successfully!";
                 } else {
-                    $error = "Failed to create room.";
+                    $error = "Failed to create room. A room with this ID already exists.";
                 }
             } elseif ($_POST['action'] === 'join') {
-                if (authenticateUser($username, $password)) {
-                    if (handleRoom($roomId, $username, false)) {
-                        $_SESSION['username'] = $username;
+                if (verifyRoomPassword($roomId, $password)) {
+                    if (handleRoom($roomId, $password, false)) {
                         $_SESSION['roomId'] = $roomId;
                         $success = "Joined room successfully!";
                     } else {
                         $error = "Room does not exist.";
                     }
                 } else {
-                    $error = "Invalid username or password.";
+                    $error = "Invalid room ID or password.";
                 }
             }
         }
+        // Store flash messages into the session.
+        $_SESSION['flash']['error'] = $error;
+        $_SESSION['flash']['success'] = $success;
     } elseif (isset($_POST['logout'])) {
         session_unset();
         session_destroy();
     }
-}
-if (isset($_GET['roomId'], $_GET['role']) && isset($_SESSION['username'])) {
-    $roomId = preg_replace('/[^a-zA-Z0-9]/', '', $_GET['roomId']);
-    $role = preg_replace('/[^a-zA-Z]/', '', $_GET['role']);
-    $filename = "signal_{$role}_{$roomId}.json";
-    $key = hash('sha256', $roomId.'_encryption_salt', true);
-    switch ($_SERVER['REQUEST_METHOD']) {
-        case 'DELETE':
-            echo json_encode(file_exists($filename) ? (unlink($filename) ? ['status' => 'deleted'] : ['status' => 'error deleting']) : ['status' => 'file not found']);
-            break;
-        case 'POST':
-            $data = file_get_contents("php://input");
-            $iv = openssl_random_pseudo_bytes(16);
-            file_put_contents($filename, base64_encode($iv.openssl_encrypt($data, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv)));
-            echo json_encode(['status' => 'saved', 'encrypted' => true]);
-            break;
-        case 'GET':
-            if (file_exists($filename)) {
-                $binary = base64_decode(file_get_contents($filename));
-                header('Content-Type: application/json');
-                echo openssl_decrypt(substr($binary, 16), 'AES-256-CBC', $key, OPENSSL_RAW_DATA, substr($binary, 0, 16));
-            } else {
-                echo json_encode(['status' => 'no data']);
-            }
-            break;
-    }
+    // Redirect to the same page to prevent resubmission.
+    header("Location: " . $_SERVER['PHP_SELF']);
     exit;
 }
 ?>
@@ -132,23 +94,29 @@ if (isset($_GET['roomId'], $_GET['role']) && isset($_SESSION['username'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>P2P Video Chat</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="/root.css">
+    <link rel="stylesheet" href="root.css">
     <link rel="stylesheet" href="slider.css">
 </head>
 <body>
-    <?php if (isset($_SESSION['username']) && isset($_SESSION['roomId'])): ?>
+<!--  include '../header.php'; -->
+    <?php
+    // Retrieve flash messages and clear them.
+    $error = $_SESSION['flash']['error'];
+    $success = $_SESSION['flash']['success'];
+    $_SESSION['flash'] = ['error' => null, 'success' => null];
+    ?>
+    <?php if (isset($_SESSION['roomId'])): ?>
         <script src="speech.js"></script>
         <script src="merge.js"></script>
         <div class="container">
             <div class="room-info">
                 <h2>Room: <?php echo htmlspecialchars($_SESSION['roomId']); ?></h2>
-                <p>Welcome, <?php echo htmlspecialchars($_SESSION['username']); ?>!</p>
             </div>
             <form class="logout-form" method="post">
                 <button type="submit" name="logout" class="btn btn-danger">Leave Room</button>
             </form>
             <div class="connection-info">
-                <h3>Connection Setup</h3>
+                <h2>Connection Setup</h2>
                 <div class="room-controls">
                     <input type="hidden" id="roomId" value="<?php echo htmlspecialchars($_SESSION['roomId']); ?>">
                     <button id="createRoom" class="btn">Create Connection</button>
@@ -188,10 +156,9 @@ if (isset($_GET['roomId'], $_GET['role']) && isset($_SESSION['username'])) {
                     <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
                 <?php endif; ?>
                 <form method="post" class="auth-form">
-                    <input type="text" name="username" placeholder="Username" required autocomplete="username">
-                    <input type="password" name="password" placeholder="Password" required  autocomplete="current-password">
                     <input type="text" name="roomId" id="roomIdInput" placeholder="Room ID" required>
                     <button type="button" id="generateRoomBtn" class="btn">Generate Room ID</button>
+                    <input type="password" name="password" placeholder="Room Password" required autocomplete="current-password">
                     <div class="auth-buttons">
                         <button type="submit" name="action" value="create" class="btn">Create Room</button>
                         <button type="submit" name="action" value="join" class="btn">Join Room</button>
@@ -200,6 +167,38 @@ if (isset($_GET['roomId'], $_GET['role']) && isset($_SESSION['username'])) {
             </div>
         </div>
     <?php endif; ?>
+    
+<?php
+// Additional room request handling based on GET parameters remains unchanged.
+if (isset($_GET['roomId'], $_GET['role']) && isset($_SESSION['roomId'])) {
+    $roomId = preg_replace('/[^a-zA-Z0-9]/', '', $_GET['roomId']);
+    $role = preg_replace('/[^a-zA-Z]/', '', $_GET['role']);
+    $filename = "signal_{$role}_{$roomId}.json";
+    $key = hash('sha256', $roomId.'_encryption_salt', true);
+    switch ($_SERVER['REQUEST_METHOD']) {
+        case 'DELETE':
+            echo json_encode(file_exists($filename) ? (unlink($filename) ? ['status' => 'deleted'] : ['status' => 'error deleting']) : ['status' => 'file not found']);
+            break;
+        case 'POST':
+            $data = file_get_contents("php://input");
+            $iv = openssl_random_pseudo_bytes(16);
+            file_put_contents($filename, base64_encode($iv.openssl_encrypt($data, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv)));
+            echo json_encode(['status' => 'saved', 'encrypted' => true]);
+            break;
+        case 'GET':
+            if (file_exists($filename)) {
+                $binary = base64_decode(file_get_contents($filename));
+                header('Content-Type: application/json');
+                echo openssl_decrypt(substr($binary, 16), 'AES-256-CBC', $key, OPENSSL_RAW_DATA, substr($binary, 0, 16));
+            } else {
+                echo json_encode(['status' => 'no data']);
+            }
+            break;
+    }
+    exit;
+}
+?>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const generateRoomBtn = document.getElementById('generateRoomBtn');
@@ -425,6 +424,7 @@ if (isset($_GET['roomId'], $_GET['role']) && isset($_SESSION['username'])) {
                         console.log('Waiting for ' + role + '...'); 
                     }
                 }, 2000);
+                
                 return interval;
             },
             createRoom = () => {

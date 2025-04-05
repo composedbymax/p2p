@@ -91,7 +91,7 @@ function injectTranscriptMergerUI() {
             color: rgba(0, 251, 255, 0.9);
         }
         h3 {
-            padding: 2rem;
+            padding: 1rem;
             text-align: center;
         }
         #outputContent {
@@ -127,6 +127,7 @@ function injectTranscriptMergerUI() {
                 <option value="txt">TXT</option>
             </select>
             <button id="downloadBtn" disabled>Download</button>
+            <button id="createEndpointBtn" disabled>Create Conversation Endpoint</button>
         </div>
     `;
     document.body.appendChild(container);
@@ -150,6 +151,7 @@ function injectTranscriptMergerUI() {
         mergedLines = [...lines1, ...lines2].sort((a, b) => a.timestamp - b.timestamp);
         const outputContent = document.getElementById('outputContent');
         const downloadBtn = document.getElementById('downloadBtn');
+        const createEndpointBtn = document.getElementById('createEndpointBtn');
         if (mergedLines.length) {
             outputContent.innerHTML = mergedLines.map(line => `
                 <div class="transcript-line">
@@ -159,9 +161,11 @@ function injectTranscriptMergerUI() {
                 </div>
             `).join('');
             downloadBtn.disabled = false;
+            createEndpointBtn.disabled = false;
         } else {
             outputContent.innerHTML = '<p>Please provide valid transcripts.</p>';
             downloadBtn.disabled = true;
+            createEndpointBtn.disabled = true;
         }
     }
     function downloadFile() {
@@ -202,6 +206,31 @@ function injectTranscriptMergerUI() {
         link.click();
         document.body.removeChild(link);
     }
+    function createEndpoint() {
+        if (!mergedLines.length) {
+            alert('Please merge transcripts first.');
+            return;
+        }
+        fetch('create_endpoint.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ transcripts: mergedLines })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.url) {
+                const outputContent = document.getElementById('outputContent');
+                outputContent.innerHTML += `<p><strong>Endpoint URL:</strong> <a href="${data.url}" target="_blank">${data.url}</a></p>`;
+            } else {
+                alert('Error: No URL returned.');
+            }
+        })
+        .catch(error => {
+            alert('Error contacting endpoint: ' + error);
+        });
+    }
     function parseTranscript(transcript, speaker) {
         if (!transcript) return [];
         const regex = /\[(?:\d{1,2}\/\d{1,2}\/\d{4},\s*)?(\d{1,2}:\d{2}:\d{2} [APM]{2})\]\s*([^\[]+)/g;
@@ -237,5 +266,6 @@ function injectTranscriptMergerUI() {
     }
     document.getElementById('mergeBtn').addEventListener('click', mergeTranscripts);
     document.getElementById('downloadBtn').addEventListener('click', downloadFile);
+    document.getElementById('createEndpointBtn').addEventListener('click', createEndpoint);
 }
 injectTranscriptMergerUI();
