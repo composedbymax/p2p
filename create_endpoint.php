@@ -27,3 +27,4 @@ $host = $_SERVER['HTTP_HOST'];
 $scriptDir = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
 $url = $protocol . '://' . $host . $scriptDir . '/conversations/conversation_' . $roomId . '.json';
 echo json_encode(['url' => $url]);
+?>
