@@ -4,7 +4,6 @@ define('ROOMS_FILE', 'rooms.json');
 if (!file_exists(ROOMS_FILE)) {
     file_put_contents(ROOMS_FILE, json_encode([]));
 }
-
 function verifyRoomPassword($roomId, $password) {
     $rooms = json_decode(file_get_contents(ROOMS_FILE), true);
     foreach ($rooms as $room) {
@@ -14,7 +13,6 @@ function verifyRoomPassword($roomId, $password) {
     }
     return false;
 }
-
 function handleRoom($roomId, $password, $isCreate = false) {
     $rooms = json_decode(file_get_contents(ROOMS_FILE), true);
     $roomExists = false;
@@ -40,12 +38,9 @@ function handleRoom($roomId, $password, $isCreate = false) {
     file_put_contents(ROOMS_FILE, json_encode($rooms));
     return $roomExists;
 }
-
-// Initialize flash messages
 if (!isset($_SESSION['flash'])) {
     $_SESSION['flash'] = ['error' => null, 'success' => null];
 }
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_GET['roomId'], $_GET['role'])) {
     $error = null;
     $success = null;
@@ -75,32 +70,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_GET['roomId'], $_GET['role
                 }
             }
         }
-        // Store flash messages into the session.
         $_SESSION['flash']['error'] = $error;
         $_SESSION['flash']['success'] = $success;
     } elseif (isset($_POST['logout'])) {
         session_unset();
         session_destroy();
     }
-    // Redirect to the same page to prevent resubmission.
     header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+}
+if (isset($_GET['roomId'], $_GET['role']) && isset($_SESSION['roomId'])) {
+    $roomId = preg_replace('/[^a-zA-Z0-9]/', '', $_GET['roomId']);
+    $role = preg_replace('/[^a-zA-Z]/', '', $_GET['role']);
+    $filename = "signal_{$role}_{$roomId}.json";
+    $key = hash('sha256', $roomId.'_encryption_salt', true);
+    switch ($_SERVER['REQUEST_METHOD']) {
+        case 'DELETE':
+            echo json_encode(file_exists($filename) ? (unlink($filename) ? ['status' => 'deleted'] : ['status' => 'error deleting']) : ['status' => 'file not found']);
+            break;
+        case 'POST':
+            $data = file_get_contents("php://input");
+            $iv = openssl_random_pseudo_bytes(16);
+            file_put_contents($filename, base64_encode($iv.openssl_encrypt($data, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv)));
+            echo json_encode(['status' => 'saved', 'encrypted' => true]);
+            break;
+        case 'GET':
+            if (file_exists($filename)) {
+                $binary = base64_decode(file_get_contents($filename));
+                header('Content-Type: application/json');
+                echo openssl_decrypt(substr($binary, 16), 'AES-256-CBC', $key, OPENSSL_RAW_DATA, substr($binary, 0, 16));
+            } else {
+                echo json_encode(['status' => 'no data']);
+            }
+            break;
+    }
     exit;
 }
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <title>P2P - MAX</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>P2P Video Chat</title>
+    <meta name="description" content="P2P Connections">
+    <meta name="author" content="MAX">
+    <meta name="robots" content="noindex, nofollow">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="root.css">
     <link rel="stylesheet" href="slider.css">
 </head>
 <body>
-<!--  include '../header.php'; -->
     <?php
-    // Retrieve flash messages and clear them.
     $error = $_SESSION['flash']['error'];
     $success = $_SESSION['flash']['success'];
     $_SESSION['flash'] = ['error' => null, 'success' => null];
@@ -156,7 +177,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_GET['roomId'], $_GET['role
                     <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
                 <?php endif; ?>
                 <form method="post" class="auth-form">
-                    <input type="text" name="roomId" id="roomIdInput" placeholder="Room ID" required>
+                    <input type="text" name="roomId" id="roomIdInput" placeholder="Room ID" required autocomplete="username">
                     <button type="button" id="generateRoomBtn" class="btn">Generate Room ID</button>
                     <input type="password" name="password" placeholder="Room Password" required autocomplete="current-password">
                     <div class="auth-buttons">
@@ -167,38 +188,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_GET['roomId'], $_GET['role
             </div>
         </div>
     <?php endif; ?>
-    
-<?php
-// Additional room request handling based on GET parameters remains unchanged.
-if (isset($_GET['roomId'], $_GET['role']) && isset($_SESSION['roomId'])) {
-    $roomId = preg_replace('/[^a-zA-Z0-9]/', '', $_GET['roomId']);
-    $role = preg_replace('/[^a-zA-Z]/', '', $_GET['role']);
-    $filename = "signal_{$role}_{$roomId}.json";
-    $key = hash('sha256', $roomId.'_encryption_salt', true);
-    switch ($_SERVER['REQUEST_METHOD']) {
-        case 'DELETE':
-            echo json_encode(file_exists($filename) ? (unlink($filename) ? ['status' => 'deleted'] : ['status' => 'error deleting']) : ['status' => 'file not found']);
-            break;
-        case 'POST':
-            $data = file_get_contents("php://input");
-            $iv = openssl_random_pseudo_bytes(16);
-            file_put_contents($filename, base64_encode($iv.openssl_encrypt($data, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv)));
-            echo json_encode(['status' => 'saved', 'encrypted' => true]);
-            break;
-        case 'GET':
-            if (file_exists($filename)) {
-                $binary = base64_decode(file_get_contents($filename));
-                header('Content-Type: application/json');
-                echo openssl_decrypt(substr($binary, 16), 'AES-256-CBC', $key, OPENSSL_RAW_DATA, substr($binary, 0, 16));
-            } else {
-                echo json_encode(['status' => 'no data']);
-            }
-            break;
-    }
-    exit;
-}
-?>
-
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const generateRoomBtn = document.getElementById('generateRoomBtn');
