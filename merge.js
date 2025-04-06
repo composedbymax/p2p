@@ -6,7 +6,7 @@ function injectTranscriptMergerUI() {
             top: 0;
             left: 0; 
             width: 320px;
-            height: 100%;
+            height: 100vh;
             background: rgba(0, 0, 0, 0.95);
             box-shadow: 2px 0 5px rgba(0, 0, 0, 0.3);
             transform: translateX(-100%);
@@ -21,8 +21,9 @@ function injectTranscriptMergerUI() {
         }
         #popoutContainer .tab {
             position: absolute;
-            top: 10%;
+            top: 9%;
             width: 50px;
+            height: 50px;
             right: -50px;
             background: rgba(0, 0, 0, 0.95);
             color: #fff;
@@ -102,6 +103,9 @@ function injectTranscriptMergerUI() {
             height: 150px;
             overflow-y: auto;
             margin-bottom: 12px;
+        }
+        @media (max-width: 768px) {
+            #popoutContainer .tab {top: 8%;}
         }
     `;
     document.head.appendChild(style);

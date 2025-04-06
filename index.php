@@ -8,24 +8,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="no-referrer">
     <meta name="description" content="P2P connections">
+    <meta name="theme-color" content="#e600ff">
     <meta name="author" content="MAX W">
     <meta name="robots" content="noindex, nofollow">
     <meta http-equiv="Strict-Transport-Security" content="max-age=31536000; includeSubDomains; preload">
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'nonce-<?php echo $_SESSION['nonce']; ?>';">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'nonce-<?php echo $_SESSION['nonce']; ?>';">
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
     <meta http-equiv="Permissions-Policy" content="geolocation=(), microphone=(self), camera=(self)">
     <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link rel="preload" href="style.css" as="style">
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="root.css">
     <link rel="stylesheet" href="slider.css">
+    <noscript>
+        <p>Please enable JavaScript to experience the full functionality of this site.</p>
+    </noscript>
 </head>
 <body>
-
 <?php
 $error = $_SESSION['flash']['error'];
 $success = $_SESSION['flash']['success'];
 $_SESSION['flash'] = ['error' => null, 'success' => null];
 ?>
+<?php include '../header.php' ?>
 <?php if (isset($_SESSION['roomId'])): ?>
 <script src="speech.js" nonce="<?php echo $_SESSION['nonce']; ?>" defer></script>
 <script src="merge.js" nonce="<?php echo $_SESSION['nonce']; ?>" defer></script>
@@ -90,5 +95,6 @@ $_SESSION['flash'] = ['error' => null, 'success' => null];
 </div>
 <script src="floor.js" nonce="<?php echo $_SESSION['nonce']; ?>"></script>
 <?php endif; ?>
+<?php include '../footer.php' ?>
 </body>
 </html>

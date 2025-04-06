@@ -46,18 +46,20 @@
             transform: translateX(calc(100% - 0px));
             display: flex;
             flex-direction: column;
-            z-index: 1000;
+            z-index: 999;
             box-shadow: -4px 0 10px rgba(0,0,0,0.2);
         }
         #speech-recorder-container.expanded { transform: translateX(0); }
         #microphone-tab {
             position: absolute;
+            width: 50px;
+            height: 50px;
+            top: 9%;
             left: 0px;
-            top: 10%;
             transform: rotate(-90deg) translateY(-50%);
             transform-origin: left center;
             background: rgba(0, 0, 0, 0.95);
-            padding: 10px 15px;
+            padding: 10px;
             border-radius: 5px 5px 0 0;
             cursor: pointer;
             display: flex;
@@ -88,8 +90,10 @@
         .control-group { margin: 10px 0; }
         .control-group label { display: block; margin-bottom: 5px; font-size: 14px; }
         #frequency-control-group { display: none; }
-        @media (max-width: 600px) {
+        @media (max-width: 768px) {
             #speech-recorder-container { width: 80%; transition: 0.5s; }
+            #speech-recorder-container.expanded { transform: translateX(0); }
+            #microphone-tab {top: 8%;}
         }
     `;
     document.head.appendChild(style);
