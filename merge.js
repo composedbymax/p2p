@@ -40,7 +40,7 @@ function injectTranscriptMergerUI() {
             color:#000;
         }
         #popoutContainer .content {
-            padding: 15px;
+            padding: 10px;
             overflow-y: auto;
             flex-grow: 1;
             background: rgba(0, 0, 0, 0.8);
@@ -60,7 +60,7 @@ function injectTranscriptMergerUI() {
             margin-bottom: 12px;
         }
         #popoutContainer button {
-            padding: 12px 16px;
+            padding: 10px 14px;
             background: rgba(0, 251, 255, 0.9);
             color: #000;
             font-weight: 600;
@@ -68,7 +68,7 @@ function injectTranscriptMergerUI() {
             border-radius: 6px;
             width: 100%;
             cursor: pointer;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
             transition: background 0.3s;
         }
         #popoutContainer button:hover {
@@ -79,7 +79,7 @@ function injectTranscriptMergerUI() {
             cursor: not-allowed;
         }
         .transcript-line {
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             font-size: 0.9em;
             color: #f1f1f1;
         }
@@ -109,6 +109,7 @@ function injectTranscriptMergerUI() {
         }
     `;
     document.head.appendChild(style);
+    
     const container = document.createElement('div');
     container.id = 'popoutContainer';
     container.innerHTML = `
@@ -132,6 +133,7 @@ function injectTranscriptMergerUI() {
             </select>
             <button id="downloadBtn" disabled>Download</button>
             <button id="createEndpointBtn" disabled>Create Conversation Endpoint</button>
+            <button id="deleteEndpointBtn" disabled>Delete Conversation Endpoint</button>
         </div>
     `;
     document.body.appendChild(container);
@@ -156,6 +158,7 @@ function injectTranscriptMergerUI() {
         const outputContent = document.getElementById('outputContent');
         const downloadBtn = document.getElementById('downloadBtn');
         const createEndpointBtn = document.getElementById('createEndpointBtn');
+        const deleteEndpointBtn = document.getElementById('deleteEndpointBtn');
         if (mergedLines.length) {
             outputContent.innerHTML = mergedLines.map(line => `
                 <div class="transcript-line">
@@ -166,10 +169,12 @@ function injectTranscriptMergerUI() {
             `).join('');
             downloadBtn.disabled = false;
             createEndpointBtn.disabled = false;
+            deleteEndpointBtn.disabled = false;
         } else {
             outputContent.innerHTML = '<p>Please provide valid transcripts.</p>';
             downloadBtn.disabled = true;
             createEndpointBtn.disabled = true;
+            deleteEndpointBtn.disabled = true;
         }
     }
     function downloadFile() {
@@ -235,6 +240,27 @@ function injectTranscriptMergerUI() {
             alert('Error contacting endpoint: ' + error);
         });
     }
+    function deleteEndpoint() {
+        fetch('delete_endpoint.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ transcripts: mergedLines })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const outputContent = document.getElementById('outputContent');
+                outputContent.innerHTML += `<p>Conversation endpoint deleted successfully.</p>`;
+            } else {
+                alert('Error: ' + (data.error || 'Could not delete endpoint.'));
+            }
+        })
+        .catch(error => {
+            alert('Error contacting deletion endpoint: ' + error);
+        });
+    }
     function parseTranscript(transcript, speaker) {
         if (!transcript) return [];
         const regex = /\[(?:\d{1,2}\/\d{1,2}\/\d{4},\s*)?(\d{1,2}:\d{2}:\d{2} [APM]{2})\]\s*([^\[]+)/g;
@@ -271,5 +297,6 @@ function injectTranscriptMergerUI() {
     document.getElementById('mergeBtn').addEventListener('click', mergeTranscripts);
     document.getElementById('downloadBtn').addEventListener('click', downloadFile);
     document.getElementById('createEndpointBtn').addEventListener('click', createEndpoint);
+    document.getElementById('deleteEndpointBtn').addEventListener('click', deleteEndpoint);
 }
 injectTranscriptMergerUI();

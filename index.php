@@ -12,7 +12,6 @@
     <meta name="author" content="MAX W">
     <meta name="robots" content="noindex, nofollow">
     <meta http-equiv="Strict-Transport-Security" content="max-age=31536000; includeSubDomains; preload">
-    <meta http-equiv="Content-Security-Policy" content="script-src 'nonce-<?php echo $_SESSION['nonce']; ?>';">
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
     <meta http-equiv="Permissions-Policy" content="geolocation=(), microphone=(self), camera=(self)">
     <meta http-equiv="X-XSS-Protection" content="1; mode=block">
@@ -26,8 +25,8 @@
 </head>
 <body>
 <?php
-$error = $_SESSION['flash']['error'];
-$success = $_SESSION['flash']['success'];
+$error = isset($_SESSION['flash']['error']) ? $_SESSION['flash']['error'] : null;
+$success = isset($_SESSION['flash']['success']) ? $_SESSION['flash']['success'] : null;
 $_SESSION['flash'] = ['error' => null, 'success' => null];
 ?>
 <?php include '../header.php' ?>
@@ -40,6 +39,7 @@ $_SESSION['flash'] = ['error' => null, 'success' => null];
     </div>
     <form class="logout-form" method="post">
         <button type="submit" name="logout" class="btn btn-danger">Leave Room</button>
+        <button type="button" id="deleteRoomBtn" class="btn btn-danger">Delete Room</button>
     </form>
     <div class="connection-info">
         <h2>Connection Setup</h2>
