@@ -1,5 +1,5 @@
-<?php require 'p2p.php' ?>
-<?php require 'nonce.php' ?>
+<?php require 'api/p2p.php' ?>
+<?php require 'api/nonce.php' ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -16,9 +16,10 @@
     <meta http-equiv="Permissions-Policy" content="geolocation=(), microphone=(self), camera=(self)">
     <meta http-equiv="X-XSS-Protection" content="1; mode=block">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <link rel="preload" href="style.css" as="style">
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="slider.css">
+    <link rel="preload" href="css/style.css" as="style">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/slider.css">
+    <link rel="stylesheet" href="css/root.css">
     <noscript>
         <p>Please enable JavaScript to experience the full functionality of this site.</p>
     </noscript>
@@ -29,10 +30,7 @@ $error = isset($_SESSION['flash']['error']) ? $_SESSION['flash']['error'] : null
 $success = isset($_SESSION['flash']['success']) ? $_SESSION['flash']['success'] : null;
 $_SESSION['flash'] = ['error' => null, 'success' => null];
 ?>
-<?php include '../header.php' ?>
 <?php if (isset($_SESSION['roomId'])): ?>
-<script src="speech.js" nonce="<?php echo $_SESSION['nonce']; ?>" defer></script>
-<script src="merge.js" nonce="<?php echo $_SESSION['nonce']; ?>" defer></script>
 <div class="container">
     <div class="room-info">
         <h2>Room: <?php echo htmlspecialchars($_SESSION['roomId']); ?></h2>
@@ -71,7 +69,10 @@ $_SESSION['flash'] = ['error' => null, 'success' => null];
     </div>
     <button id="disconnectBtn" class="btn btn-danger" disabled>Disconnect</button>
 </div>
-<script src="app.js" nonce="<?php echo $_SESSION['nonce']; ?>"></script>
+<script src="scripts/speech.js" nonce="<?php echo $_SESSION['nonce']; ?>" defer></script>
+<script src="scripts/merge.js" nonce="<?php echo $_SESSION['nonce']; ?>" defer></script>
+<script src="scripts/app.js" nonce="<?php echo $_SESSION['nonce']; ?>"></script>
+<script src="scripts/record.js" nonce="<?php echo $_SESSION['nonce']; ?>"></script>
 <?php else: ?>
 <div class="container">
     <div class="auth-container">
@@ -93,8 +94,7 @@ $_SESSION['flash'] = ['error' => null, 'success' => null];
         </form>
     </div>
 </div>
-<script src="floor.js" nonce="<?php echo $_SESSION['nonce']; ?>"></script>
+<script src="scripts/floor.js" nonce="<?php echo $_SESSION['nonce']; ?>"></script>
 <?php endif; ?>
-<?php include '../footer.php' ?>
 </body>
 </html>

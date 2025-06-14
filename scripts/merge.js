@@ -137,28 +137,36 @@ function injectTranscriptMergerUI() {
         </div>
     `;
     document.body.appendChild(container);
+    
     function togglePanel() {
         container.classList.toggle('active');
     }
+    
     container.querySelector('.tab').addEventListener('click', togglePanel);
+    
     document.addEventListener('click', function(event) {
         if (!container.contains(event.target) && container.classList.contains('active')) {
             container.classList.remove('active');
         }
     });
+    
     let mergedLines = [];
+    
     function mergeTranscripts() {
         const speaker1Name = document.getElementById('speaker1').value.trim() || 'Speaker 1';
         const speaker2Name = document.getElementById('speaker2').value.trim() || 'Speaker 2';
         const transcript1 = document.getElementById('transcript1').value.trim();
         const transcript2 = document.getElementById('transcript2').value.trim();
+        
         const lines1 = parseTranscript(transcript1, speaker1Name);
         const lines2 = parseTranscript(transcript2, speaker2Name);
         mergedLines = [...lines1, ...lines2].sort((a, b) => a.timestamp - b.timestamp);
+        
         const outputContent = document.getElementById('outputContent');
         const downloadBtn = document.getElementById('downloadBtn');
         const createEndpointBtn = document.getElementById('createEndpointBtn');
         const deleteEndpointBtn = document.getElementById('deleteEndpointBtn');
+        
         if (mergedLines.length) {
             outputContent.innerHTML = mergedLines.map(line => `
                 <div class="transcript-line">
@@ -220,12 +228,15 @@ function injectTranscriptMergerUI() {
             alert('Please merge transcripts first.');
             return;
         }
-        fetch('create_endpoint.php', {
+        fetch('api/transcript_manager.php', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ transcripts: mergedLines })
+            body: JSON.stringify({ 
+                action: 'create',
+                transcripts: mergedLines 
+            })
         })
         .then(response => response.json())
         .then(data => {
@@ -233,20 +244,23 @@ function injectTranscriptMergerUI() {
                 const outputContent = document.getElementById('outputContent');
                 outputContent.innerHTML += `<p><strong>Endpoint URL:</strong> <a href="${data.url}" target="_blank">${data.url}</a></p>`;
             } else {
-                alert('Error: No URL returned.');
+                alert('Error: ' + (data.error || 'No URL returned.'));
             }
         })
         .catch(error => {
             alert('Error contacting endpoint: ' + error);
         });
     }
+    
     function deleteEndpoint() {
-        fetch('delete_endpoint.php', {
+        fetch('transcript_manager.php', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ transcripts: mergedLines })
+            body: JSON.stringify({ 
+                action: 'delete'
+            })
         })
         .then(response => response.json())
         .then(data => {
@@ -261,24 +275,31 @@ function injectTranscriptMergerUI() {
             alert('Error contacting deletion endpoint: ' + error);
         });
     }
+    
     function parseTranscript(transcript, speaker) {
         if (!transcript) return [];
+        
         const regex = /\[(?:\d{1,2}\/\d{1,2}\/\d{4},\s*)?(\d{1,2}:\d{2}:\d{2} [APM]{2})\]\s*([^\[]+)/g;
         const lines = [];
         let match;
+        
         while ((match = regex.exec(transcript)) !== null) {
             const timestampStr = match[1];
             const text = match[2].trim();
             const normalizedTimestamp = normalizeTimestamp(timestampStr);
+            
             const [time, period] = normalizedTimestamp.split(' ');
             const [hours, minutes, seconds] = time.split(':');
             let hour = parseInt(hours);
+            
             if (period === 'PM' && hour !== 12) {
                 hour += 12;
             } else if (period === 'AM' && hour === 12) {
                 hour = 0;
             }
+            
             const timestamp = new Date(1970, 0, 1, hour, parseInt(minutes), parseInt(seconds));
+            
             lines.push({
                 timestamp,
                 timestampFormatted: normalizedTimestamp,
@@ -286,17 +307,21 @@ function injectTranscriptMergerUI() {
                 text
             });
         }
+        
         return lines;
     }
+    
     function normalizeTimestamp(timestampStr) {
         const [time, period] = timestampStr.split(' ');
         const [hours, minutes, seconds] = time.split(':');
         const paddedHours = hours.padStart(2, '0');
         return `${paddedHours}:${minutes}:${seconds} ${period}`;
     }
+    
     document.getElementById('mergeBtn').addEventListener('click', mergeTranscripts);
     document.getElementById('downloadBtn').addEventListener('click', downloadFile);
     document.getElementById('createEndpointBtn').addEventListener('click', createEndpoint);
     document.getElementById('deleteEndpointBtn').addEventListener('click', deleteEndpoint);
 }
+
 injectTranscriptMergerUI();

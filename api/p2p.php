@@ -1,6 +1,6 @@
 <?php
 session_start();
-define('ROOMS_FILE', 'rooms.json');
+define('ROOMS_FILE', 'api/rooms.json');
 if (!file_exists(ROOMS_FILE)) {
     file_put_contents(ROOMS_FILE, json_encode([]));
 }
