@@ -27,10 +27,77 @@
     pollOffer,
     activeStream = null,
     isInActiveRoom = false,
-    cameraStarted = false;
+    cameraStarted = false,
+    encryptionKey = null,
+    offerCreationTimeout = null,
+    iceGatheringTimeout = null,
+    maxOfferRetries = 3,
+    currentOfferRetry = 0;
+
   if (roomInput) {
     roomId = roomInput.value;
   }
+  const generateEncryptionKey = async (roomId) => {
+    const encoder = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      "raw",
+      encoder.encode(roomId + "_encryption_salt"),
+      { name: "PBKDF2" },
+      false,
+      ["deriveBits", "deriveKey"]
+    );
+    return await crypto.subtle.deriveKey(
+      {
+        name: "PBKDF2",
+        salt: encoder.encode("webrtc_signal_salt"),
+        iterations: 100000,
+        hash: "SHA-256"
+      },
+      keyMaterial,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"]
+    );
+  };
+  const encryptData = async (data, key) => {
+    const encoder = new TextEncoder();
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encodedData = encoder.encode(JSON.stringify(data));
+    const encryptedData = await crypto.subtle.encrypt(
+      {
+        name: "AES-GCM",
+        iv: iv
+      },
+      key,
+      encodedData
+    );
+    const combined = new Uint8Array(iv.length + encryptedData.byteLength);
+    combined.set(iv);
+    combined.set(new Uint8Array(encryptedData), iv.length);
+    return btoa(String.fromCharCode(...combined));
+  };
+  const decryptData = async (encryptedBase64, key) => {
+    try {
+      const combined = new Uint8Array(
+        atob(encryptedBase64).split('').map(char => char.charCodeAt(0))
+      );
+      const iv = combined.slice(0, 12);
+      const encryptedData = combined.slice(12);
+      const decryptedData = await crypto.subtle.decrypt(
+        {
+          name: "AES-GCM",
+          iv: iv
+        },
+        key,
+        encryptedData
+      );
+      const decoder = new TextDecoder();
+      return JSON.parse(decoder.decode(decryptedData));
+    } catch (e) {
+      console.error("Decryption failed:", e);
+      return null;
+    }
+  };
   const updateStatus = (msg) => {
       if (connStat) {
         connStat.textContent = "Status: " + msg;
@@ -146,6 +213,75 @@
         );
       }
     },
+    clearAllTimeouts = () => {
+      if (offerCreationTimeout) {
+        clearTimeout(offerCreationTimeout);
+        offerCreationTimeout = null;
+      }
+      if (iceGatheringTimeout) {
+        clearTimeout(iceGatheringTimeout);
+        iceGatheringTimeout = null;
+      }
+    },
+    createOfferWithFailsafe = async () => {
+      clearAllTimeouts();
+      currentOfferRetry++;
+      try {
+        updateStatus(`Creating offer (attempt ${currentOfferRetry}/${maxOfferRetries})...`);
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        updateStatus("Offer created. Gathering ICE candidates...");
+        iceGatheringTimeout = setTimeout(() => {
+          console.warn("ICE gathering timeout - posting offer anyway");
+          if (pc && pc.localDescription) {
+            postSDP(pc.localDescription, "offer");
+            updateStatus("Offer posted (ICE gathering timeout). Waiting for answer...");
+          }
+        }, 15000);
+        offerCreationTimeout = setTimeout(async () => {
+          console.error("Offer creation/posting timeout");
+          if (currentOfferRetry < maxOfferRetries) {
+            updateStatus(`Offer timeout. Retrying... (${currentOfferRetry + 1}/${maxOfferRetries})`);
+            await recreatePeerConnection();
+            createOfferWithFailsafe();
+          } else {
+            updateStatus("Failed to create offer after multiple attempts. Please try again.");
+            resetConnectionState();
+          }
+        }, 30000);
+      } catch (e) {
+        console.error("Offer creation failed:", e);
+        clearAllTimeouts();
+        if (currentOfferRetry < maxOfferRetries) {
+          updateStatus(`Offer creation failed. Retrying... (${currentOfferRetry + 1}/${maxOfferRetries})`);
+          setTimeout(async () => {
+            await recreatePeerConnection();
+            createOfferWithFailsafe();
+          }, 2000);
+        } else {
+          updateStatus("Failed to create offer after multiple attempts: " + e.message);
+          resetConnectionState();
+        }
+      }
+    },
+    recreatePeerConnection = async () => {
+      if (pc) {
+        pc.close();
+      }
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      initPC();
+    },
+    resetConnectionState = () => {
+      clearAllTimeouts();
+      currentOfferRetry = 0;
+      createBtn.disabled = joinBtn.disabled = false;
+      discBtn.disabled = true;
+      isInActiveRoom = false;
+      if (pc) {
+        pc.close();
+        pc = null;
+      }
+    },
     initPC = () => {
       pc = new RTCPeerConnection(config);
       if (activeStream === "camera" && localStream) {
@@ -159,12 +295,29 @@
         if (e.candidate) {
           console.log("ICE candidate:", e.candidate);
         } else if (isCreator && pc.localDescription) {
+          clearTimeout(iceGatheringTimeout);
+          iceGatheringTimeout = null;
+          console.log("ICE gathering complete, posting offer");
           postSDP(pc.localDescription, "offer");
+          updateStatus("Offer posted. Waiting for answer...");
+        }
+      };
+      pc.onicegatheringstatechange = () => {
+        console.log("ICE gathering state:", pc.iceGatheringState);
+        if (pc.iceGatheringState === "complete" && isCreator && pc.localDescription) {
+          clearTimeout(iceGatheringTimeout);
+          iceGatheringTimeout = null;
+          console.log("ICE gathering complete (via state change), posting offer");
+          postSDP(pc.localDescription, "offer");
+          updateStatus("Offer posted. Waiting for answer...");
         }
       };
       pc.onconnectionstatechange = () => {
         const state = pc.connectionState;
+        console.log("Connection state:", state);
         if (state === "connected") {
+          clearAllTimeouts();
+          currentOfferRetry = 0;
           updateStatus("Peer connection established!");
           updatePeer("Connected");
           deleteSDP();
@@ -189,24 +342,42 @@
       });
       updateStatus("P2P Connection established");
     },
-    postSDP = (sdp, role) => {
-      fetch("index.php?roomId=" + roomId + "&role=" + role, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: sdp.type, sdp: sdp.sdp }),
-      })
-        .then((r) => r.json())
-        .then((data) => console.log(role + " posted:", data))
-        .catch((e) => console.error("Error posting " + role, e));
+    postSDP = async (sdp, role) => {
+      try {
+        const encryptedData = await encryptData(
+          { type: sdp.type, sdp: sdp.sdp },
+          encryptionKey
+        );
+        const response = await fetch("index.php?roomId=" + roomId + "&role=" + role, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: encryptedData
+        });
+        const result = await response.json();
+        console.log(role + " posted successfully:", result);
+        if (role === "offer") {
+          clearAllTimeouts();
+          currentOfferRetry = 0;
+        }
+      } catch (e) {
+        console.error("Error posting " + role, e);
+        if (role === "offer" && isCreator) {
+          if (currentOfferRetry < maxOfferRetries) {
+            updateStatus(`Failed to post offer. Retrying... (${currentOfferRetry + 1}/${maxOfferRetries})`);
+            setTimeout(async () => {
+              await recreatePeerConnection();
+              createOfferWithFailsafe();
+            }, 2000);
+          } else {
+            updateStatus("Failed to post offer after multiple attempts.");
+            resetConnectionState();
+          }
+        }
+      }
     },
     createOffer = async () => {
-      try {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        updateStatus("Offer created. Waiting for answer...");
-      } catch (e) {
-        updateStatus("Offer creation failed: " + e.message);
-      }
+      currentOfferRetry = 0;
+      createOfferWithFailsafe();
     },
     createAnswer = async () => {
       try {
@@ -223,10 +394,14 @@
           const res = await fetch(
             "index.php?roomId=" + roomId + "&role=" + role
           );
-          const data = await res.json();
-          if (data?.type && data.sdp) {
-            clearInterval(interval);
-            callback(data);
+          const responseText = await res.text();
+          
+          if (responseText && responseText !== '{"status":"no data"}') {
+            const decryptedData = await decryptData(responseText, encryptionKey);
+            if (decryptedData && decryptedData.type && decryptedData.sdp) {
+              clearInterval(interval);
+              callback(decryptedData);
+            }
           }
         } catch (e) {
           console.log("Waiting for " + role + "...");
@@ -234,7 +409,7 @@
       }, 2000);
       return interval;
     },
-    createRoom = () => {
+    createRoom = async () => {
       if (!cameraStarted) {
         return updateStatus(
           "Please start your camera first"
@@ -243,19 +418,26 @@
       if (!roomId) {
         return updateStatus("Please enter or generate a room ID.");
       }
+      try {
+        encryptionKey = await generateEncryptionKey(roomId);
+      } catch (e) {
+        return updateStatus("Failed to generate encryption key: " + e.message);
+      }
       isCreator = true;
       initPC();
       isInActiveRoom = true;
-      updateStatus("Connection initiated!Creating offer...");
+      currentOfferRetry = 0;
+      updateStatus("Connection initiated! Creating offer...");
       createBtn.disabled = joinBtn.disabled = true;
       discBtn.disabled = false;
       createOffer();
       pollAnswer = pollSDP("answer", async (data) => {
+        clearAllTimeouts();
         updateStatus("Answer received. Establishing connection...");
         await pc.setRemoteDescription(new RTCSessionDescription(data));
       });
     },
-    joinRoom = () => {
+    joinRoom = async () => {
       if (!cameraStarted) {
         return updateStatus(
           "Please start your camera first"
@@ -263,6 +445,11 @@
       }
       if (!roomId) {
         return updateStatus("Please enter a room ID to join.");
+      }
+      try {
+        encryptionKey = await generateEncryptionKey(roomId);
+      } catch (e) {
+        return updateStatus("Failed to generate encryption key: " + e.message);
       }
       isCreator = false;
       initPC();
@@ -283,6 +470,8 @@
     },
     disconnect = () => {
       [pollAnswer, pollOffer].forEach((i) => i && clearInterval(i));
+      clearAllTimeouts();
+      currentOfferRetry = 0;
       deleteSDP();
       if (pc) {
         pc.close();
@@ -292,6 +481,7 @@
       createBtn.disabled = joinBtn.disabled = false;
       discBtn.disabled = true;
       isInActiveRoom = false;
+      encryptionKey = null;
       updateStatus("Disconnected from peer.");
       updatePeer("Waiting for peer to connect...");
     };

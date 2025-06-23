@@ -16,7 +16,7 @@
     const style = document.createElement('style');
     style.textContent = `
         .sbtn {
-            background: rgba(0, 251, 255, 0.9);
+            background: var(--blue);
             color: #000;
             font-weight: 600;
             border: none;
@@ -30,7 +30,7 @@
             text-align: center;
             display: inline-block;
         }
-        .sbtn:hover { background: rgba(0, 251, 255, 1); transform: scale(1.05); }
+        .sbtn:hover { background: var(--blueh); transform: scale(1.05); }
         .sbtn:disabled { background: #444; cursor: not-allowed; }
         #speech-recorder-container {
             position: fixed;
@@ -39,34 +39,38 @@
             height: 100vh;
             width: 450px;
             max-width: 90%;
-            background: rgba(0, 0, 0, 0.95);
-            color: #f1f1f1;
-            font-family: Arial, sans-serif;
+            background: var(--glass);
+            backdrop-filter:blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            color: var(--white);
             transition: transform 0.3s ease;
             transform: translateX(calc(100% - 0px));
             display: flex;
             flex-direction: column;
             z-index: 999;
-            box-shadow: -4px 0 10px rgba(0,0,0,0.2);
+            box-shadow: -4px 0 10px var(--shade2);
+            border-left:2px solid var(--shade2);
         }
         #speech-recorder-container.expanded { transform: translateX(0); }
         #microphone-tab {
             position: absolute;
             width: 50px;
             height: 50px;
-            top: 9%;
-            left: 0px;
+            top: 3%;
             transform: rotate(-90deg) translateY(-50%);
             transform-origin: left center;
-            background: rgba(0, 0, 0, 0.95);
+            background: var(--glass);
+            backdrop-filter:blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             padding: 10px;
             border-radius: 5px 5px 0 0;
             cursor: pointer;
             display: flex;
             align-items: center;
-            box-shadow: -4px 0 10px rgba(0,0,0,0.2);
+            box-shadow: -4px 0 10px var(--shade2);
+            border:2px solid var(--shade2);
         }
-        #microphone-tab:hover { background: rgba(0, 251, 255, 1); color:#000; }
+        #microphone-tab:hover { background: var(--blueh); color:#000; }
         #microphone-tab svg { transform: rotate(90deg); }
         #speech-recorder-content {
             margin-top: 2rem;
@@ -78,7 +82,7 @@
         #speech-status { margin: 10px 0; font-weight: bold; }
         #speech-transcript {
             width: 100%;
-            background: rgba(0, 0, 0, 0.3);
+            background: var(--shade2);
             border: 1px solid #555;
             border-radius: 6px;
             padding: 10px;
@@ -93,7 +97,6 @@
         @media (max-width: 768px) {
             #speech-recorder-container { width: 80%; transition: 0.5s; }
             #speech-recorder-container.expanded { transform: translateX(0); }
-            #microphone-tab {top: 8%;}
         }
     `;
     document.head.appendChild(style);

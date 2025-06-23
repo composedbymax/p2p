@@ -1,5 +1,5 @@
 <?php require 'api/p2p.php' ?>
-<?php require 'api/nonce.php' ?>
+<?php require '../nonce.php' ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,21 +8,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="no-referrer">
     <meta name="description" content="P2P connections">
-    <meta name="theme-color" content="#e600ff">
+    <meta name="theme-color" content="#272727">
     <meta name="author" content="MAX W">
     <meta name="robots" content="noindex, nofollow">
     <meta http-equiv="Strict-Transport-Security" content="max-age=31536000; includeSubDomains; preload">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'nonce-<?php echo $_SESSION['nonce']; ?>';">
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
     <meta http-equiv="Permissions-Policy" content="geolocation=(), microphone=(self), camera=(self)">
     <meta http-equiv="X-XSS-Protection" content="1; mode=block">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <link rel="preload" href="css/style.css" as="style">
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="css/slider.css">
-    <link rel="stylesheet" href="css/root.css">
-    <noscript>
-        <p>Please enable JavaScript to experience the full functionality of this site.</p>
-    </noscript>
+    <link rel="stylesheet" href="/_assets/css/p2p.css">
+    <link rel="stylesheet" href="/_assets/css/slider.css">
+    <link rel="stylesheet" href="/_assets/css/root.css">
+    <noscript><p>Please enable JavaScript to experience the full functionality of this site.</p></noscript>
 </head>
 <body>
 <?php
@@ -69,10 +67,10 @@ $_SESSION['flash'] = ['error' => null, 'success' => null];
     </div>
     <button id="disconnectBtn" class="btn btn-danger" disabled>Disconnect</button>
 </div>
-<script src="scripts/speech.js" nonce="<?php echo $_SESSION['nonce']; ?>" defer></script>
-<script src="scripts/merge.js" nonce="<?php echo $_SESSION['nonce']; ?>" defer></script>
-<script src="scripts/app.js" nonce="<?php echo $_SESSION['nonce']; ?>"></script>
-<script src="scripts/record.js" nonce="<?php echo $_SESSION['nonce']; ?>"></script>
+<script src="/_assets/js/app.js" nonce="<?php echo $_SESSION['nonce']; ?>"></script>
+<script src="/_assets/js/speech.js" nonce="<?php echo $_SESSION['nonce']; ?>" defer></script>
+<script src="/_assets/js/merge.js" nonce="<?php echo $_SESSION['nonce']; ?>" defer></script>
+<script src="/_assets/js/record.js" nonce="<?php echo $_SESSION['nonce']; ?>"></script>
 <?php else: ?>
 <div class="container">
     <div class="auth-container">
@@ -94,7 +92,7 @@ $_SESSION['flash'] = ['error' => null, 'success' => null];
         </form>
     </div>
 </div>
-<script src="scripts/floor.js" nonce="<?php echo $_SESSION['nonce']; ?>"></script>
+<script src="/_assets/js/floor.js" nonce="<?php echo $_SESSION['nonce']; ?>"></script>
 <?php endif; ?>
 </body>
 </html>

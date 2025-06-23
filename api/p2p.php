@@ -82,23 +82,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_GET['roomId'], $_GET['role
 if (isset($_GET['roomId'], $_GET['role']) && isset($_SESSION['roomId'])) {
     $roomId = preg_replace('/[^a-zA-Z0-9]/', '', $_GET['roomId']);
     $role = preg_replace('/[^a-zA-Z]/', '', $_GET['role']);
-    $filename = "signal_{$role}_{$roomId}.json";
-    $key = hash('sha256', $roomId.'_encryption_salt', true);
+    $filename = "signal_{$role}_{$roomId}.dat";
     switch ($_SERVER['REQUEST_METHOD']) {
         case 'DELETE':
-            echo json_encode(file_exists($filename) ? (unlink($filename) ? ['status' => 'deleted'] : ['status' => 'error deleting']) : ['status' => 'file not found']);
+            if (file_exists($filename)) {
+                $deleted = unlink($filename);
+                echo json_encode(['status' => $deleted ? 'deleted' : 'error deleting']);
+            } else {
+                echo json_encode(['status' => 'file not found']);
+            }
             break;
         case 'POST':
-            $data = file_get_contents("php://input");
-            $iv = openssl_random_pseudo_bytes(16);
-            file_put_contents($filename, base64_encode($iv.openssl_encrypt($data, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv)));
-            echo json_encode(['status' => 'saved', 'encrypted' => true]);
+            $encryptedData = file_get_contents("php://input");
+            if (empty($encryptedData)) {
+                echo json_encode(['status' => 'error', 'message' => 'No data received']);
+                break;
+            }
+            $success = file_put_contents($filename, $encryptedData);
+            if ($success !== false) {
+                echo json_encode(['status' => 'saved', 'encrypted' => true]);
+            } else {
+                echo json_encode(['status' => 'error', 'message' => 'Failed to save data']);
+            }
             break;
         case 'GET':
             if (file_exists($filename)) {
-                $binary = base64_decode(file_get_contents($filename));
-                header('Content-Type: application/json');
-                echo openssl_decrypt(substr($binary, 16), 'AES-256-CBC', $key, OPENSSL_RAW_DATA, substr($binary, 0, 16));
+                $encryptedData = file_get_contents($filename);
+                if ($encryptedData !== false && !empty($encryptedData)) {
+                    header('Content-Type: text/plain');
+                    echo $encryptedData;
+                } else {
+                    echo json_encode(['status' => 'no data']);
+                }
             } else {
                 echo json_encode(['status' => 'no data']);
             }

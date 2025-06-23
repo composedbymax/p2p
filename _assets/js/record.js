@@ -18,54 +18,52 @@ class AudioCaptureModal {
         style.textContent = `
             .audio-modal-overlay{position: fixed;top: 0;left: 0;width: 100%;height: 100%;backdrop-filter: blur(4px);z-index: 9998;visibility: hidden;transition: all 0.3s ease;}
             .audio-modal-overlay.active{opacity: 1;visibility: visible;}
-            .audio-modal{position: fixed;top: 0;right: -400px;width: 380px;height: 100vh;background: var(--gradient);color: var(--text);box-shadow: -5px 0 20px var(--shade);transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);z-index: 9999;overflow-y: auto;font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;}
+            .audio-modal{position: fixed;top: 0;right: -400px;width: 380px;height: 100vh;background: var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter: blur(20px);color: var(--white);box-shadow: -5px 0 20px var(--shade);transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);z-index: 9999;overflow-y: auto; border-left:2px solid var(--shade2);}
             .audio-modal.open{right: 0;}
-            .audio-modal-header{padding: 24px 20px 16px;border-bottom: 1px solid var(--dark2);position: sticky;top: 0;background: inherit;backdrop-filter: blur(10px);}
-            .audio-modal-title{font-size: 22px;font-weight: 600;margin: 0 0 8px 0;color: var(--accent);}
-            .audio-modal-subtitle{font-size: 14px;color: var(--text2);margin: 0;}
-            .audio-modal-close{position: absolute;top: 20px;right: 20px;background: none;border: none;color: var(--text2);font-size: 24px;cursor: pointer;padding: 4px;border-radius: 4px;transition: all 0.2s ease;}
-            .audio-modal-close:hover{color: var(--text);background: var(--dark2);}
+            .audio-modal-header{padding: 24px 20px 16px;border-bottom: 1px solid var(--gray);position: sticky;top: 0;background: inherit;backdrop-filter: blur(10px);}
+            .audio-modal-title{font-size: 22px;font-weight: 600;margin: 0 0 8px 0;color: var(--blue);}
+            .audio-modal-close{position: absolute;top: 20px;right: 20px;background: none;border: none;color: var(--light-gray);font-size: 24px;cursor: pointer;padding: 4px;border-radius: 4px;transition: all 0.2s ease;}
+            .audio-modal-close:hover{color: var(--white);background: var(--gray);}
             .audio-modal-content{padding: 24px 20px;}
             .audio-capture-section{margin-bottom: 32px;}
             .audio-capture-controls{display: flex;flex-direction: column;gap: 12px;margin-bottom: 20px;}
             .audio-btn{padding: 12px 20px;border: none;border-radius: 8px;font-size: 14px;font-weight: 500;cursor: pointer;transition: all 0.2s ease;display: flex;align-items: center;justify-content: center;gap: 8px;}
-            .audio-btn-primary{background: linear-gradient(135deg, var(--accent), var(--accenth));color: var(--black);}
-            .audio-btn-primary:hover:not(:disabled){transform: translateY(-1px);box-shadow: 0 4px 12px var(--accentg);}
-            .audio-btn-secondary{background: var(--dark2);color: var(--text);border: 1px solid var(--dark3);}
-            .audio-btn-secondary:hover:not(:disabled){background: var(--dark3);}
-            .audio-btn-danger{background: var(--red);color: var(--text);}
+            .audio-btn-primary{background: linear-gradient(135deg, var(--blue), var(--blueh));color: var(--black);}
+            .audio-btn-primary:hover:not(:disabled){transform: translateY(-1px);box-shadow: 0 4px 12px var(--shade);}
+            .audio-btn-secondary{background: var(--glass);color: var(--white);border: 1px solid var(--dark3);}
+            .audio-btn-secondary:hover:not(:disabled){background: var(--glassh);}
+            .audio-btn-danger{background: var(--red);color: var(--white);}
             .audio-btn-danger:hover:not(:disabled){background: var(--redh);transform: translateY(-1px);}
             .audio-btn:disabled{opacity: 0.5;cursor: not-allowed;transform: none !important;box-shadow: none !important;}
-            .recording-indicator{display: none;align-items: center;gap: 8px;padding: 12px 16px;background: rgba(220, 53, 69, 0.1);border: 1px solid var(--red);border-radius: 8px;margin-bottom: 16px;}
+            .recording-indicator{display: none;align-items: center;gap: 8px;padding: 12px 16px;background: var(--redh);border: 1px solid var(--red);border-radius: 8px;margin-bottom: 16px;}
             .recording-indicator.active{display: flex;}
             .recording-dot{width: 8px;height: 8px;background: var(--red);border-radius: 50%;animation: pulse 1.5s infinite;}
             @keyframes pulse{0%, 100%{opacity: 1;}50%{opacity: 0.3;}}
             .recording-time{font-family: monospace;font-size: 14px;color: var(--red);}
-            .recordings-section{border-top: 1px solid var(--dark2);padding-top: 24px;}
-            .recordings-title{font-size: 18px;font-weight: 600;margin: 0 0 16px 0;color: var(--text1);}
-            .recording-item{background: var(--dark1);border: 1px solid var(--dark2);border-radius: 8px;padding: 16px;margin-bottom: 12px;transition: all 0.2s ease;}
-            .recording-item:hover{background: var(--dark2);border-color: var(--dark3);}
-            .recording-name{font-size: 14px;font-weight: 500;margin: 0 0 8px 0;color: var(--text);}
-            .recording-meta{font-size: 12px;color: var(--text2);margin-bottom: 12px;}
+            .recordings-section{border-top: 1px solid var(--shade);padding-top: 24px;}
+            .recordings-title{font-size: 18px;font-weight: 600;margin: 0 0 16px 0;color: var(--white);}
+            .recording-item{background: var(--glass);border: 1px solid var(--gray);border-radius: 8px;padding: 16px;margin-bottom: 12px;transition: all 0.2s ease;}
+            .recording-item:hover{background: var(--glassh);border-color: var(--glass);}
+            .recording-name{font-size: 14px;font-weight: 500;margin: 0 0 8px 0;color: var(--white);}
+            .recording-meta{font-size: 12px;color: var(--light-gray);margin-bottom: 12px;}
             .recording-controls{display: flex;gap: 8px;flex-wrap: wrap;}
             .recording-controls .audio-btn{padding: 6px 12px;font-size: 12px;flex: 1;min-width: 70px;}
             .download-options{display: none;flex-direction: column;gap: 4px;margin-top: 8px;}
             .download-options.active{display: flex;}
             .download-options .audio-btn{padding: 4px 8px;font-size: 11px;}
-            .no-recordings{text-align: center;color: var(--text2);font-style: italic;padding: 32px 16px;}
-            .audio-modal-trigger{position: fixed;top: 50%;right: 20px;transform: translateY(-50%);background: var(--gradient3);color: var(--accent);border: 2px solid var(--accent);width: 50px;height: 50px;border-radius: 50%;cursor: pointer;box-shadow: 0 4px 12px var(--accentg);transition: all 0.3s ease;z-index: 9997;display: flex;align-items: center;justify-content: center;}
-            .audio-modal-trigger:hover{transform: translateY(-50%) scale(1.1);background: var(--accent);color: var(--black);}
+            .no-recordings{text-align: center;color: var(--light-gray);font-style: italic;padding: 32px 16px;}
+            .audio-modal-trigger{position: fixed;bottom: 0;right: 20px;transform: translateY(-50%);background: var(--gradient);border: 2px solid var(--black);width: 50px;height: 50px;border-radius: 50%;cursor: pointer;transition: all 0.3s ease;z-index: 9997;display: flex;align-items: center;justify-content: center;}
+            .audio-modal-trigger:hover{background: var(--green);border: 1px solid var(--white);}
             .audio-modal-trigger svg{width: 20px;height: 20px;}
             @media (max-width: 480px){.audio-modal{width: 100%;right: -100%;}
             .audio-modal-trigger{right: 15px;}}
         `;
         document.head.appendChild(style);
     }
-
     injectHTML() {
         const modalHTML = `
             <button class="audio-modal-trigger" id="audioModalTrigger">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg viewBox="0 0 24 24" fill="none" stroke="var(--white)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M11 5L6 9H2v6h4l5 4V5z"/>
                     <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
                     <path d="M19.07 4.93a9 9 0 0 1 0 14.14"/>
@@ -75,7 +73,6 @@ class AudioCaptureModal {
             <div class="audio-modal" id="audioModal">
                 <div class="audio-modal-header">
                     <h2 class="audio-modal-title">Audio Capture</h2>
-                    <p class="audio-modal-subtitle">Record microphone audio</p>
                     <button class="audio-modal-close" id="audioModalClose">×</button>
                 </div>
                 <div class="audio-modal-content">
